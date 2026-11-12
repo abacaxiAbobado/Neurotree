@@ -1,0 +1,43 @@
+{
+  "createdAt": "2026-11-11T18:29:48.092Z",
+  "label": "turma_1_manha",
+  "totalFolhas": 3,
+  "folhas": [
+    {
+      "id": "6507006c-498a-4682-b7b8-4356ad173b8e",
+      "nome": "Prof. Carlos Eduardo",
+      "cor": "#10B981",
+      "profissao": "Engenheiro de Computação",
+      "assinatura": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAGggJ/PchI7wAAAABJRU5ErkJggg==",
+      "mensagem": "Bem-vindos à Feira de Cursos da EEEP! O futuro começa agora.",
+      "edit_token": "7e84c639-74b3-4488-a42f-159fdc72638c",
+      "edit_expires_at": "2026-11-11T18:44:31.153Z",
+      "created_at": "2026-11-11T18:19:31.153Z",
+      "updated_at": "2026-11-11T18:19:31.153Z"
+    },
+    {
+      "id": "494aac9c-d9e6-42a8-b5df-8a03b8ae1509",
+      "nome": "Mariana Silva (3º Ano)",
+      "cor": "#3B82F6",
+      "profissao": "Desenvolvedora Full-Stack",
+      "assinatura": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAGggJ/PchI7wAAAABJRU5ErkJggg==",
+      "mensagem": "Construindo o NEUROTREE com tecnologia e dedicação!",
+      "edit_token": "51b2f324-dd66-47bb-8e40-6e41155366e5",
+      "edit_expires_at": "2026-11-11T18:44:31.153Z",
+      "created_at": "2026-11-11T18:24:31.153Z",
+      "updated_at": "2026-11-11T18:24:31.153Z"
+    },
+    {
+      "id": "4df74c97-927c-4fca-abcb-1c655c08e603",
+      "nome": "Gabriel Mendes",
+      "cor": "#EC4899",
+      "profissao": "Designer de Interação & Games",
+      "assinatura": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAGggJ/PchI7wAAAABJRU5ErkJggg==",
+      "mensagem": "A arte e o código transformando ideias em realidade.",
+      "edit_token": "1c3a2668-0a76-4e0b-ad04-8f3a16328e15",
+      "edit_expires_at": "2026-11-11T18:44:31.153Z",
+      "created_at": "2026-11-11T18:29:31.153Z",
+      "updated_at": "2026-11-11T18:29:31.153Z"
+    }
+  ]
+}

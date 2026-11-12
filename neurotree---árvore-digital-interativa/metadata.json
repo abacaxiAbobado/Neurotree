@@ -1,0 +1,6 @@
+{
+  "name": "NEUROTREE - Árvore Digital Interativa",
+  "description": "Sistema interativo de árvore digital coletiva para a Feira de Cursos da EEEP, com persistência em PostgreSQL, comunicação em tempo real via Socket.IO e gestão de folhas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
