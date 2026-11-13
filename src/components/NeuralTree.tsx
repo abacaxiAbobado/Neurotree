@@ -1862,23 +1862,6 @@ export function NeuralTree({
       sctx.stroke();
       sctx.restore();
 
-      const trunkCoreLight = sctx.createRadialGradient(
-        trunkCenterX,
-        trunkMidY,
-        width * 0.006,
-        trunkCenterX,
-        trunkMidY,
-        width * 0.052
-      );
-      trunkCoreLight.addColorStop(0, 'rgba(254, 240, 138, 0.68)');
-      trunkCoreLight.addColorStop(0.42, 'rgba(245, 196, 81, 0.32)');
-      trunkCoreLight.addColorStop(0.85, 'rgba(125, 211, 252, 0.09)');
-      trunkCoreLight.addColorStop(1, 'transparent');
-      sctx.fillStyle = trunkCoreLight;
-      sctx.beginPath();
-      sctx.arc(trunkCenterX, trunkMidY, width * 0.052, 0, Math.PI * 2);
-      sctx.fill();
-
       // 4. OS 5 BRAÇOS MESTRES
       const masterBoughs = MASTER_BOUGHS_DEF.map((def) => ({
         pts: def.pts.map(([nx, ny]) => ({ x: nx * width, y: ny * height })),
@@ -1895,6 +1878,29 @@ export function NeuralTree({
         const endPt = mb.pts[mb.pts.length - 1];
         const baseW = Math.max(16, width * mb.wFactor);
 
+        // Colar de enraizamento: leva a madeira do braço para dentro do tronco,
+        // para que a base do galho se funda ao tronco sem estrangulamento.
+        const collarRoot = {
+          x: startPt.x + (trunkCenterX - startPt.x) * 0.45,
+          y: trunkMidY - height * 0.015,
+        };
+        const collarGrad = sctx.createLinearGradient(
+          collarRoot.x,
+          collarRoot.y,
+          mb.pts[1].x,
+          mb.pts[1].y
+        );
+        collarGrad.addColorStop(0, '#131F3D');
+        collarGrad.addColorStop(1, mb.edgeShade ? '#142142' : '#18284E');
+        drawTaperedSpline(
+          [collarRoot, startPt, mb.pts[1]],
+          baseW * 1.1,
+          baseW * 0.95,
+          collarGrad,
+          mb.phase,
+          false
+        );
+
         const boughWoodGrad = sctx.createLinearGradient(startPt.x, startPt.y, endPt.x, endPt.y);
         if (mb.edgeShade) {
           boughWoodGrad.addColorStop(0, 'rgba(17, 29, 58, 0.0)');
@@ -1907,7 +1913,7 @@ export function NeuralTree({
           boughWoodGrad.addColorStop(0.55, '#0F1933');
           boughWoodGrad.addColorStop(1, '#0A1024');
         }
-        drawTaperedSpline(mb.pts, baseW, mb.w1, boughWoodGrad, mb.phase, true, 0.16);
+        drawTaperedSpline(mb.pts, baseW, mb.w1, boughWoodGrad, mb.phase, false, 0.16);
 
         const hiPts = mb.pts.map((p) => ({ x: p.x, y: p.y - 1.5 }));
         const hiGrad = sctx.createLinearGradient(startPt.x, startPt.y, endPt.x, endPt.y);
