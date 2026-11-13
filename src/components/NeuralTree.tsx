@@ -1942,6 +1942,9 @@ export function NeuralTree({
 
       const strandToMasterMap = [0, 1, 2, 2, 2, 3, 4];
       strandToMasterMap.forEach((mbIdx, sIdx) => {
+        // Os fios laterais que alimentam o braço central faziam um gancho dourado
+        // no topo do tronco; só o fio do meio (sIdx 3) sobe reto até o braço.
+        if (mbIdx === 2 && sIdx !== 3) return;
         const mb = masterBoughs[mbIdx];
         const norm = strandNorms[sIdx] ?? 0;
         const waistX =
