@@ -1,1 +1,55 @@
 @import "tailwindcss";
+
+:root {
+  --font-display: 'Outfit', system-ui, -apple-system, sans-serif;
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+
+  --astral-bg: #070b19;
+  --astral-surface: #0e152b;
+  --astral-surface-alt: #131c38;
+  --astral-border: #1e2949;
+  --astral-text: #f8f6f0;
+  --astral-muted: #94a3c8;
+  --astral-gold: #f5c451;
+  --astral-copper: #d97706;
+}
+
+body {
+  background-color: var(--astral-bg);
+  color: var(--astral-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+@keyframes sway {
+  0% {
+    transform: rotate3d(0, 0, 1, -2.8deg);
+  }
+  100% {
+    transform: rotate3d(0, 0, 1, 2.8deg);
+  }
+}
+
+@keyframes leaf-bloom {
+  0% {
+    opacity: 0;
+    transform: scale(0.05);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.26);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

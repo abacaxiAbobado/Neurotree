@@ -149,9 +149,9 @@ export class AdminController {
       ];
 
       const CORES = [
-        '#10B981', '#3B82F6', '#8B5CF6', '#EF4444', '#F59E0B',
-        '#EC4899', '#06B6D4', '#84CC16', '#14B8A6', '#6366F1',
-        '#F97316', '#D946EF', '#22C55E', '#38BDF8',
+        '#F5C451', '#F59E0B', '#FDE68A', '#38BDF8',
+        '#6366F1', '#A855F7', '#FB7185', '#2DD4BF',
+        '#EAB308', '#818CF8', '#F472B6', '#60A5FA',
       ];
 
       const MENSAGENS = [

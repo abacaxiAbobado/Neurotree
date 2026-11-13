@@ -3,7 +3,11 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 export const config = {
-  port: parseInt(process.env.PORT || '3000', 10),
+  port: parseInt(
+    process.env.APP_PORT ||
+      (process.env.PORT && process.env.PORT !== '8080' ? process.env.PORT : '3000'),
+    10
+  ),
   nodeEnv: process.env.NODE_ENV || 'development',
   isProduction: process.env.NODE_ENV === 'production',
   

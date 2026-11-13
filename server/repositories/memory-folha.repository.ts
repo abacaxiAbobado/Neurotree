@@ -15,7 +15,7 @@ export class MemoryFolhaRepository implements IFolhaRepository {
     const demo1: Folha = {
       id: crypto.randomUUID(),
       nome: 'Prof. Carlos Eduardo',
-      cor: '#10B981',
+      cor: '#F5C451',
       profissao: 'Engenheiro de Computação',
       assinatura:
         'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAGggJ/PchI7wAAAABJRU5ErkJggg==',
@@ -29,7 +29,7 @@ export class MemoryFolhaRepository implements IFolhaRepository {
     const demo2: Folha = {
       id: crypto.randomUUID(),
       nome: 'Mariana Silva (3º Ano)',
-      cor: '#3B82F6',
+      cor: '#38BDF8',
       profissao: 'Desenvolvedora Full-Stack',
       assinatura:
         'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAGggJ/PchI7wAAAABJRU5ErkJggg==',
@@ -43,7 +43,7 @@ export class MemoryFolhaRepository implements IFolhaRepository {
     const demo3: Folha = {
       id: crypto.randomUUID(),
       nome: 'Gabriel Mendes',
-      cor: '#EC4899',
+      cor: '#A855F7',
       profissao: 'Designer de Interação & Games',
       assinatura:
         'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAGggJ/PchI7wAAAABJRU5ErkJggg==',

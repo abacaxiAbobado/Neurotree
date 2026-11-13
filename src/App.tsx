@@ -35,14 +35,14 @@ export interface Folha {
 }
 
 const PRESET_COLORS = [
-  { name: 'Esmeralda', hex: '#10B981' },
-  { name: 'Oceano', hex: '#3B82F6' },
-  { name: 'Ametista', hex: '#8B5CF6' },
-  { name: 'Rubi', hex: '#EF4444' },
-  { name: 'Âmbar', hex: '#F59E0B' },
-  { name: 'Rosa Choque', hex: '#EC4899' },
-  { name: 'Ciano Neón', hex: '#06B6D4' },
-  { name: 'Lima Vibrante', hex: '#84CC16' },
+  { name: 'Ouro Solar', hex: '#F5C451', darkCheck: true },
+  { name: 'Âmbar Real', hex: '#F59E0B', darkCheck: true },
+  { name: 'Marfim Estrelado', hex: '#FDE68A', darkCheck: true },
+  { name: 'Celeste Polar', hex: '#38BDF8', darkCheck: true },
+  { name: 'Índigo Estelar', hex: '#6366F1', darkCheck: false },
+  { name: 'Ametista Lunar', hex: '#A855F7', darkCheck: false },
+  { name: 'Coral Aurora', hex: '#FB7185', darkCheck: true },
+  { name: 'Turquesa Astral', hex: '#2DD4BF', darkCheck: true },
 ];
 
 export default function App() {
@@ -53,10 +53,11 @@ export default function App() {
   const [repoType, setRepoType] = useState<'postgresql' | 'memory'>('memory');
   const [dbConnected, setDbConnected] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
+  const [newLeafBirths, setNewLeafBirths] = useState<Record<string, number>>({});
 
   // Formulário do participante
   const [nome, setNome] = useState('');
-  const [cor, setCor] = useState('#10B981');
+  const [cor, setCor] = useState('#F5C451');
   const [profissao, setProfissao] = useState('');
   const [mensagem, setMensagem] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -128,6 +129,9 @@ export default function App() {
     socket.on('folha:created', (newFolha: Folha) => {
       setFolhas((prev) => [newFolha, ...prev.filter((f) => f.id !== newFolha.id)]);
       setTotalCount((prev) => prev + 1);
+      setNewLeafBirths((prev) =>
+        prev[newFolha.id] ? prev : { ...prev, [newFolha.id]: Date.now() }
+      );
     });
 
     socket.on('folha:updated', (updatedFolha: Folha) => {
@@ -151,6 +155,7 @@ export default function App() {
       setFolhas([]);
       setTotalCount(0);
       setSelectedFolha(null);
+      setNewLeafBirths({});
     });
 
     // Busca status da API
@@ -230,7 +235,7 @@ export default function App() {
     ctx.lineWidth = 2.5;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.strokeStyle = '#10B981';
+    ctx.strokeStyle = '#F5C451';
     ctx.lineTo(x, y);
     ctx.stroke();
   };
@@ -331,6 +336,11 @@ export default function App() {
         }
 
         setSubmitSuccess(data.data);
+        if (data.data?.id) {
+          setNewLeafBirths((prev) =>
+            prev[data.data.id] ? prev : { ...prev, [data.data.id]: Date.now() }
+          );
+        }
         if (data.editToken) {
           setMyEditToken(data.editToken);
           setMyEditExpiresAt(data.editExpiresAt);
@@ -469,6 +479,17 @@ export default function App() {
       const leavesRes = await fetch('/api/folha?limit=200');
       const leavesData = await leavesRes.json();
       if (leavesData.success) {
+        const existingIds = new Set(folhas.map((f) => f.id));
+        const now = Date.now();
+        const addedBirths: Record<string, number> = {};
+        leavesData.data.forEach((f: Folha) => {
+          if (!existingIds.has(f.id)) {
+            addedBirths[f.id] = now;
+          }
+        });
+        if (Object.keys(addedBirths).length > 0) {
+          setNewLeafBirths((prev) => ({ ...prev, ...addedBirths }));
+        }
         setFolhas(leavesData.data);
         setTotalCount(leavesData.data.length);
       }
@@ -480,74 +501,107 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-white">
-      {/* Barra de Navegação Superior */}
-      <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 via-teal-500 to-amber-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-              <TreeDeciduous className="w-6 h-6 text-slate-950" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-emerald-400 via-teal-300 to-amber-300 bg-clip-text text-transparent">
-                  NEUROTREE • YGGDRASIL
-                </span>
-                <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  Feira EEEP • Fios Trançados
-                </span>
-              </div>
-              <p className="text-xs text-slate-400">Árvore Cósmica de Linhas Temporais em Tempo Real</p>
-            </div>
-          </div>
+    <div className="min-h-screen bg-[#070B19] text-[#F8F6F0] flex flex-col selection:bg-[#F5C451] selection:text-[#070B19]">
+      {/* Barra de Navegação Superior — Contrato Limpo em 3 Zonas + Abas com Linha Indicadora Ativa */}
+      <header className="border-b border-[#1E2949] bg-[#0A1024]/90 backdrop-blur-md sticky top-0 z-30">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between gap-6">
+          {/* Zona 1: Marca em linha única */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('telao')}
+            className="flex items-center gap-2.5 text-left whitespace-nowrap shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F5C451] rounded-lg"
+          >
+            <TreeDeciduous className="w-5 h-5 text-[#F5C451] shrink-0" />
+            <span className="font-display font-bold text-lg tracking-tight text-[#F8F6F0]">
+              NEUROTREE
+            </span>
+          </button>
 
-          {/* Abas */}
-          <nav className="flex items-center gap-1 bg-slate-800/80 p-1 rounded-xl border border-slate-700/60">
+          {/* Zona 2: Abas limpas com linha indicadora dourada ativa */}
+          <nav
+            aria-label="Navegação principal"
+            className="flex items-stretch h-16 gap-5 md:gap-7 overflow-x-auto no-scrollbar"
+          >
             <button
+              type="button"
               onClick={() => setActiveTab('telao')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 ${
+              className={`relative h-full px-1 text-xs md:text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap shrink-0 border-b-2 ${
                 activeTab === 'telao'
-                  ? 'bg-emerald-500 text-slate-950 font-semibold shadow-sm'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+                  ? 'border-[#F5C451] text-[#F8F6F0] font-semibold'
+                  : 'border-transparent text-[#94A3C8] hover:text-[#F8F6F0] hover:border-[#334678]'
               }`}
             >
-              <TreeDeciduous className="w-4 h-4" />
-              Telão da Árvore
+              <TreeDeciduous
+                className={`w-4 h-4 shrink-0 ${
+                  activeTab === 'telao' ? 'text-[#F5C451]' : 'text-[#7385AD]'
+                }`}
+              />
+              <span>Telão da Árvore</span>
             </button>
+
             <button
+              type="button"
               onClick={() => setActiveTab('formulario')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 ${
+              className={`relative h-full px-1 text-xs md:text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap shrink-0 border-b-2 ${
                 activeTab === 'formulario'
-                  ? 'bg-emerald-500 text-slate-950 font-semibold shadow-sm'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+                  ? 'border-[#F5C451] text-[#F8F6F0] font-semibold'
+                  : 'border-transparent text-[#94A3C8] hover:text-[#F8F6F0] hover:border-[#334678]'
               }`}
             >
-              <Send className="w-4 h-4" />
-              Contribuir (Celular)
+              <Send
+                className={`w-4 h-4 shrink-0 ${
+                  activeTab === 'formulario' ? 'text-[#F5C451]' : 'text-[#7385AD]'
+                }`}
+              />
+              <span>Contribuir</span>
             </button>
+
             <button
+              type="button"
               onClick={() => setActiveTab('admin')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 ${
+              className={`relative h-full px-1 text-xs md:text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap shrink-0 border-b-2 ${
                 activeTab === 'admin'
-                  ? 'bg-emerald-500 text-slate-950 font-semibold shadow-sm'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+                  ? 'border-[#F5C451] text-[#F8F6F0] font-semibold'
+                  : 'border-transparent text-[#94A3C8] hover:text-[#F8F6F0] hover:border-[#334678]'
               }`}
             >
-              <ShieldAlert className="w-4 h-4" />
-              Gestão da Feira
+              <ShieldAlert
+                className={`w-4 h-4 shrink-0 ${
+                  activeTab === 'admin' ? 'text-[#F5C451]' : 'text-[#7385AD]'
+                }`}
+              />
+              <span>Gestão da Feira</span>
             </button>
+
             <button
+              type="button"
               onClick={() => setActiveTab('docs')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 ${
+              className={`relative h-full px-1 text-xs md:text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap shrink-0 border-b-2 ${
                 activeTab === 'docs'
-                  ? 'bg-emerald-500 text-slate-950 font-semibold shadow-sm'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+                  ? 'border-[#F5C451] text-[#F8F6F0] font-semibold'
+                  : 'border-transparent text-[#94A3C8] hover:text-[#F8F6F0] hover:border-[#334678]'
               }`}
             >
-              <Code2 className="w-4 h-4" />
-              API Docs
+              <Code2
+                className={`w-4 h-4 shrink-0 ${
+                  activeTab === 'docs' ? 'text-[#F5C451]' : 'text-[#7385AD]'
+                }`}
+              />
+              <span>API Docs</span>
             </button>
           </nav>
+
+          {/* Zona 3: Ação Principal */}
+          <div className="hidden sm:flex items-center shrink-0">
+            <button
+              type="button"
+              onClick={() => setActiveTab('formulario')}
+              className="bg-[#F5C451] hover:bg-[#F7D06D] text-[#070B19] font-semibold px-4 py-2 rounded-lg text-xs transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 shadow-[0_4px_20px_rgba(245,196,81,0.18)]"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>Plantar Folha</span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -558,53 +612,56 @@ export default function App() {
         {/* ========================================================================= */}
         {activeTab === 'telao' && (
           <div className="flex-1 flex flex-col gap-4">
-            {/* Barra de Status do Telão */}
-            <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-xl">
-              <div className="flex items-center gap-3">
-                <div className="relative">
+            {/* Barra de Estado do Telão */}
+            <div className="bg-[#0E152B]/90 border border-[#1E2949] rounded-2xl px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3 text-xs text-[#94A3C8]">
+                <div className="relative flex items-center">
                   <div
-                    className={`w-3 h-3 rounded-full ${
-                      socketConnected ? 'bg-emerald-400' : 'bg-amber-400'
+                    className={`w-2.5 h-2.5 rounded-full ${
+                      socketConnected ? 'bg-[#F5C451]' : 'bg-[#D97706]'
                     }`}
                   />
                   {socketConnected && (
-                    <div className="absolute inset-0 w-3 h-3 rounded-full bg-emerald-400 animate-ping opacity-75" />
+                    <div className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-[#F5C451] animate-ping opacity-70" />
                   )}
                 </div>
-                <span className="text-xs font-medium text-slate-300">
-                  {socketConnected ? 'Socket.IO Conectado em Tempo Real' : 'Reconectando WebSocket...'}
+                <span className="font-medium text-[#E2E8F0]">
+                  {socketConnected ? 'Tempo real conectado' : 'Reconectando WebSocket...'}
                 </span>
-                <span className="text-slate-700">•</span>
-                <span className="text-xs text-slate-400">
-                  Persistência:{' '}
-                  <span className="font-semibold text-emerald-400">
-                    {repoType === 'postgresql' ? 'PostgreSQL Oficial' : 'Memória Resiliente (Fallback Ativo)'}
-                  </span>
+                <span aria-hidden="true" className="text-[#334678]">·</span>
+                <span>
+                  Armazenamento:{' '}
+                  <strong className="font-semibold text-[#F5C451]">
+                    {repoType === 'postgresql' ? 'PostgreSQL' : 'Memória Resiliente'}
+                  </strong>
                 </span>
               </div>
 
               <div className="flex items-center gap-4 text-xs">
-                <div className="flex items-center gap-1.5 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700">
-                  <Sparkles className="w-4 h-4 text-emerald-400" />
-                  <span>Total de Folhas:</span>
-                  <span className="font-bold text-white text-sm">{totalCount}</span>
+                <div className="flex items-center gap-2 text-[#94A3C8]">
+                  <span>Folhas vivas</span>
+                  <span className="font-mono tabular-nums font-semibold text-[#F8F6F0] text-sm">
+                    {totalCount}
+                  </span>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setActiveTab('formulario')}
-                  className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow-md shadow-emerald-500/20"
+                  className="bg-[#131C38] hover:bg-[#1B274D] border border-[#2C3C6B] text-[#F5C451] font-semibold px-3.5 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap"
                 >
                   <Send className="w-3.5 h-3.5" />
-                  Plantar Minha Folha
+                  <span>Plantar Minha Folha</span>
                 </button>
               </div>
             </div>
 
-            {/* Árvore Neural Interativa (Canvas, Sinapses Vivas e Nódulos Holográficos) */}
+            {/* Palco Interativo da Árvore */}
             <NeuralTree
               folhas={folhas}
               selectedFolha={selectedFolha}
               onSelectFolha={setSelectedFolha}
               onClearSelection={() => setSelectedFolha(null)}
+              newLeafBirths={newLeafBirths}
             />
           </div>
         )}
@@ -613,46 +670,46 @@ export default function App() {
         {/* ABA 2: FORMULÁRIO DO PARTICIPANTE (CELULAR / TOTEM)                       */}
         {/* ========================================================================= */}
         {activeTab === 'formulario' && (
-          <div className="max-w-2xl mx-auto w-full space-y-6">
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                    <TreeDeciduous className="w-5 h-5 text-emerald-400" />
+          <div className="max-w-2xl mx-auto w-full space-y-6 py-2">
+            <div className="bg-[#0E152B] border border-[#1E2949] rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
+              <div className="space-y-1.5 border-b border-[#1E2949] pb-4">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <h2 className="font-display text-xl md:text-2xl font-bold text-[#F8F6F0] flex items-center gap-2.5">
+                    <TreeDeciduous className="w-5 h-5 text-[#F5C451]" />
                     {isEditing ? 'Editar Minha Folha' : 'Deixe Sua Folha na Árvore'}
                   </h2>
                   {myEditToken && (
-                    <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-lg border border-emerald-500/20 flex items-center gap-1">
+                    <span className="text-xs font-mono tabular-nums text-[#F5C451] flex items-center gap-1.5">
                       <Clock className="w-3.5 h-3.5" />
                       Edição: {editRemainingTime || '15 min'}
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-slate-400">
-                  Suas respostas ficarão registradas no banco de dados e aparecerão no telão
-                  em tempo real para todos os visitantes da Feira de Cursos.
+                <p className="text-xs md:text-sm text-[#94A3C8]">
+                  Suas respostas ficam registradas no banco de dados e brotam no telão em tempo real para todos os visitantes da feira.
                 </p>
               </div>
 
               {/* Feedback de sucesso após o envio */}
               {submitSuccess && !isEditing && (
-                <div className="bg-emerald-500/15 border border-emerald-500/30 rounded-2xl p-5 space-y-3">
-                  <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
+                <div className="bg-[#F5C451]/10 border border-[#F5C451]/35 rounded-2xl p-5 space-y-3">
+                  <div className="flex items-center gap-2 text-[#F5C451] font-semibold text-sm">
                     <CheckCircle2 className="w-5 h-5" />
                     Sua folha foi plantada na árvore com sucesso!
                   </div>
-                  <p className="text-xs text-slate-300">
-                    Olhe para o telão agora! Sua folha com o sonho de ser{' '}
-                    <strong className="text-emerald-300">{submitSuccess.profissao}</strong> já está brotando.
+                  <p className="text-xs text-[#E2E8F0]">
+                    Olhe para o telão agora! Sua folha com o sonho de{' '}
+                    <strong className="text-[#F5C451]">{submitSuccess.profissao}</strong> já está brotando.
                   </p>
                   {myEditToken && (
-                    <div className="flex items-center justify-between pt-2 border-t border-emerald-500/20">
-                      <span className="text-xs text-slate-400">
-                        Errou algo? Você pode editar nos próximos 15 minutos:
+                    <div className="flex items-center justify-between pt-3 border-t border-[#F5C451]/20 gap-3 flex-wrap">
+                      <span className="text-xs text-[#94A3C8]">
+                        Deseja corrigir algum dado? Você tem 15 minutos para editar:
                       </span>
                       <button
+                        type="button"
                         onClick={handleStartEdit}
-                        className="text-xs bg-emerald-500 text-slate-950 font-bold px-3 py-1 rounded-lg hover:bg-emerald-400 transition flex items-center gap-1"
+                        className="text-xs bg-[#F5C451] text-[#070B19] font-semibold px-3.5 py-1.5 rounded-lg hover:bg-[#F7D06D] transition-colors flex items-center gap-1.5"
                       >
                         <Edit3 className="w-3.5 h-3.5" />
                         Editar Agora
@@ -663,16 +720,16 @@ export default function App() {
               )}
 
               {formError && (
-                <div className="bg-rose-500/15 border border-rose-500/30 text-rose-400 p-4 rounded-2xl text-xs">
+                <div className="bg-rose-500/10 border border-rose-400/35 text-rose-300 p-4 rounded-2xl text-xs">
                   {formError}
                 </div>
               )}
 
-              <form onSubmit={handleSubmitFolha} className="space-y-4">
+              <form onSubmit={handleSubmitFolha} className="space-y-5">
                 {/* Nome */}
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-300">
-                    Seu Nome ou Apelido <span className="text-emerald-400">*</span>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-[#CBD5E1]">
+                    Seu Nome ou Apelido <span className="text-[#F5C451]">*</span>
                   </label>
                   <input
                     type="text"
@@ -681,14 +738,14 @@ export default function App() {
                     onChange={(e) => setNome(e.target.value)}
                     maxLength={50}
                     placeholder="Ex: Ana Clara ou Aluno 3º Ano"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition"
+                    className="w-full bg-[#070B19] border border-[#1E2949] rounded-xl px-4 py-2.5 text-sm text-[#F8F6F0] placeholder-[#566894] focus:outline-none focus:border-[#F5C451] transition-colors"
                   />
                 </div>
 
                 {/* Profissão dos Sonhos */}
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-300">
-                    Profissão dos Seus Sonhos <span className="text-emerald-400">*</span>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-[#CBD5E1]">
+                    Profissão dos Seus Sonhos <span className="text-[#F5C451]">*</span>
                   </label>
                   <input
                     type="text"
@@ -697,54 +754,66 @@ export default function App() {
                     onChange={(e) => setProfissao(e.target.value)}
                     maxLength={100}
                     placeholder="Ex: Engenheiro Aeroespacial, Médica, Cientista de IA"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition"
+                    className="w-full bg-[#070B19] border border-[#1E2949] rounded-xl px-4 py-2.5 text-sm text-[#F8F6F0] placeholder-[#566894] focus:outline-none focus:border-[#F5C451] transition-colors"
                   />
                 </div>
 
                 {/* Escolha da Cor da Folha */}
                 <div className="space-y-2">
-                  <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+                  <label className="text-xs font-semibold text-[#CBD5E1] flex items-center justify-between">
                     <span>Cor da Sua Folha</span>
-                    <span className="font-mono text-emerald-400">{cor}</span>
+                    <span className="font-mono text-[#F5C451] flex items-center gap-1.5">
+                      <span className="font-sans text-[#94A3C8] font-medium">
+                        {PRESET_COLORS.find((p) => p.hex.toLowerCase() === cor.toLowerCase())?.name ?? 'Personalizada'}
+                      </span>
+                      <span>•</span>
+                      <span>{cor}</span>
+                    </span>
                   </label>
                   <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
-                    {PRESET_COLORS.map((c) => (
-                      <button
-                        type="button"
-                        key={c.hex}
-                        onClick={() => setCor(c.hex)}
-                        className={`h-9 rounded-xl flex items-center justify-center transition border ${
-                          cor.toLowerCase() === c.hex.toLowerCase()
-                            ? 'border-white scale-105 shadow-md'
-                            : 'border-transparent hover:scale-105'
-                        }`}
-                        style={{ backgroundColor: c.hex }}
-                        title={c.name}
-                      >
-                        {cor.toLowerCase() === c.hex.toLowerCase() && (
-                          <CheckCircle2 className="w-4 h-4 text-slate-950" />
-                        )}
-                      </button>
-                    ))}
+                    {PRESET_COLORS.map((c) => {
+                      const isActive = cor.toLowerCase() === c.hex.toLowerCase();
+                      return (
+                        <button
+                          type="button"
+                          key={c.hex}
+                          onClick={() => setCor(c.hex)}
+                          className={`h-9 rounded-xl flex items-center justify-center transition-transform border ${
+                            isActive
+                              ? 'border-[#F8F6F0] scale-105 shadow-md ring-2 ring-[#F5C451]/50'
+                              : 'border-[#1E2949]/60 hover:scale-105'
+                          }`}
+                          style={{ backgroundColor: c.hex }}
+                          title={c.name}
+                          aria-label={c.name}
+                        >
+                          {isActive && (
+                            <CheckCircle2
+                              className={`w-4 h-4 ${c.darkCheck ? 'text-[#070B19]' : 'text-[#F8F6F0]'}`}
+                            />
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
                 {/* Pad de Assinatura Digital */}
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-slate-300">
+                    <label className="text-xs font-semibold text-[#CBD5E1]">
                       Assinatura Digital (Desenhe com o dedo ou mouse)
                     </label>
                     <button
                       type="button"
                       onClick={clearCanvas}
-                      className="text-[11px] text-slate-400 hover:text-rose-400 flex items-center gap-1"
+                      className="text-xs text-[#94A3C8] hover:text-[#F5C451] flex items-center gap-1 transition-colors"
                     >
                       <Eraser className="w-3.5 h-3.5" />
                       Limpar
                     </button>
                   </div>
-                  <div className="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden touch-none relative">
+                  <div className="bg-[#070B19] border border-[#1E2949] rounded-2xl overflow-hidden touch-none relative">
                     <canvas
                       ref={canvasRef}
                       width={600}
@@ -759,20 +828,22 @@ export default function App() {
                       onTouchEnd={stopDrawing}
                     />
                     {!hasDrawnSignature && (
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-slate-600 text-xs italic">
-                        ✍️ Faça seu autógrafo ou rubrica aqui
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-[#566894] text-xs italic">
+                        Faça seu autógrafo ou rubrica aqui
                       </div>
                     )}
                   </div>
                 </div>
 
                 {/* Mensagem para o Futuro */}
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-slate-300">
+                    <label className="text-xs font-semibold text-[#CBD5E1]">
                       Mensagem para o Futuro (Opcional)
                     </label>
-                    <span className="text-[10px] text-slate-500">{mensagem.length}/500</span>
+                    <span className="text-[11px] font-mono tabular-nums text-[#7385AD]">
+                      {mensagem.length}/500
+                    </span>
                   </div>
                   <textarea
                     value={mensagem}
@@ -780,7 +851,7 @@ export default function App() {
                     maxLength={500}
                     rows={3}
                     placeholder="Deixe um conselho ou reflexão que você gostaria de ler daqui a 5 anos..."
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition resize-none"
+                    className="w-full bg-[#070B19] border border-[#1E2949] rounded-xl px-4 py-2.5 text-sm text-[#F8F6F0] placeholder-[#566894] focus:outline-none focus:border-[#F5C451] transition-colors resize-none"
                   />
                 </div>
 
@@ -789,7 +860,7 @@ export default function App() {
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold py-3 rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+                    className="flex-1 bg-gradient-to-r from-[#F5C451] to-[#D97706] hover:from-[#F7D06D] hover:to-[#E58A1A] text-[#070B19] font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2 shadow-[0_8px_24px_rgba(245,196,81,0.22)] disabled:opacity-50"
                   >
                     {submitting ? (
                       <RefreshCw className="w-4 h-4 animate-spin" />
@@ -803,7 +874,7 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => setIsEditing(false)}
-                      className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition"
+                      className="px-4 py-3 bg-[#131C38] hover:bg-[#1B274D] border border-[#2C3C6B] text-[#CBD5E1] rounded-xl text-xs font-semibold transition-colors"
                     >
                       Cancelar
                     </button>
@@ -818,135 +889,141 @@ export default function App() {
         {/* ABA 3: PAINEL DE GESTÃO DA FEIRA & ADMIN                                  */}
         {/* ========================================================================= */}
         {activeTab === 'admin' && (
-          <div className="max-w-4xl mx-auto w-full space-y-6">
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+          <div className="max-w-5xl mx-auto w-full space-y-6 py-2">
+            <div className="bg-[#0E152B] border border-[#1E2949] rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
+              <div className="flex items-center justify-between border-b border-[#1E2949] pb-4 gap-4 flex-wrap">
                 <div className="space-y-1">
-                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                    <ShieldAlert className="w-5 h-5 text-amber-400" />
+                  <h2 className="font-display text-xl font-bold text-[#F8F6F0] flex items-center gap-2.5">
+                    <ShieldAlert className="w-5 h-5 text-[#F5C451]" />
                     Painel de Moderação & Gestão de Sessões
                   </h2>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-[#94A3C8]">
                     Controle oficial para os organizadores da Feira de Cursos (EEEP).
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5">
                   <input
                     type="password"
                     value={adminTokenInput}
                     onChange={(e) => setAdminTokenInput(e.target.value)}
                     placeholder="ADMIN_TOKEN"
-                    className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400"
+                    className="bg-[#070B19] border border-[#1E2949] rounded-lg px-3 py-1.5 text-xs text-[#F8F6F0] focus:outline-none focus:border-[#F5C451]"
                   />
-                  <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded">
-                    Token Pronto
+                  <span className="text-xs font-medium text-[#F5C451]">
+                    Token ativo
                   </span>
                 </div>
               </div>
 
               {adminMessage && (
-                <div className="bg-slate-800 border border-slate-700 p-4 rounded-2xl text-xs text-slate-200">
+                <div className="bg-[#131C38] border border-[#2C3C6B] p-4 rounded-2xl text-xs text-[#F8F6F0]">
                   {adminMessage}
                 </div>
               )}
 
-              {/* Ações Rápidas da Feira (Reset de Turma, Exportação, Simulação) */}
+              {/* Ações Rápidas da Feira */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Reset para Nova Turma */}
-                <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-3">
-                  <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
-                    <RotateCcw className="w-4 h-4" />
-                    Nova Turma
+                <div className="bg-[#070B19] p-5 rounded-2xl border border-[#1E2949] flex flex-col justify-between gap-3">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-[#F5C451] font-semibold text-sm">
+                      <RotateCcw className="w-4 h-4" />
+                      Nova Turma
+                    </div>
+                    <p className="text-xs text-[#94A3C8]">
+                      Gera backup automático da turma atual e limpa a tela para os próximos alunos.
+                    </p>
+                    <input
+                      type="text"
+                      value={resetTurmaLabel}
+                      onChange={(e) => setResetTurmaLabel(e.target.value)}
+                      placeholder="Nome da Turma"
+                      className="w-full bg-[#0E152B] border border-[#1E2949] rounded-lg px-3 py-1.5 text-xs text-[#F8F6F0] focus:outline-none focus:border-[#F5C451]"
+                    />
                   </div>
-                  <p className="text-xs text-slate-400">
-                    Gera backup automático da turma atual e limpa a tela para os próximos alunos.
-                  </p>
-                  <input
-                    type="text"
-                    value={resetTurmaLabel}
-                    onChange={(e) => setResetTurmaLabel(e.target.value)}
-                    placeholder="Nome da Turma"
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white"
-                  />
                   <button
+                    type="button"
                     onClick={handleResetTree}
                     disabled={adminLoading}
-                    className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2 rounded-lg text-xs transition"
+                    className="w-full bg-[#F5C451] hover:bg-[#F7D06D] text-[#070B19] font-semibold py-2 rounded-lg text-xs transition-colors"
                   >
                     Resetar Árvore
                   </button>
                 </div>
 
                 {/* Simulação em Massa (100 Folhas) */}
-                <div className="bg-slate-950 p-5 rounded-2xl border border-purple-500/30 space-y-3">
-                  <div className="flex items-center gap-2 text-purple-400 font-bold text-sm">
-                    <Zap className="w-4 h-4 text-purple-400" />
-                    Simulação (100 Folhas)
+                <div className="bg-[#070B19] p-5 rounded-2xl border border-[#1E2949] flex flex-col justify-between gap-3">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-[#7DD3FC] font-semibold text-sm">
+                      <Zap className="w-4 h-4" />
+                      Simulação (100 Folhas)
+                    </div>
+                    <p className="text-xs text-[#94A3C8]">
+                      Gera instantaneamente 100 contribuições com sonhos e cores para teste do telão.
+                    </p>
                   </div>
-                  <p className="text-xs text-slate-400">
-                    Gera instantaneamente 100 contribuições com sonhos e cores para teste do telão.
-                  </p>
-                  <div className="pt-6">
-                    <button
-                      onClick={handleSimulateLeaves}
-                      disabled={adminLoading}
-                      className="w-full bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-400 hover:to-indigo-400 text-white font-bold py-2 rounded-lg text-xs transition flex items-center justify-center gap-1.5 shadow-lg shadow-purple-500/20"
-                    >
-                      <Zap className="w-3.5 h-3.5" />
-                      Simular 100 Folhas
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSimulateLeaves}
+                    disabled={adminLoading}
+                    className="w-full bg-[#131C38] hover:bg-[#1B274D] border border-[#38BDF8]/40 text-[#7DD3FC] font-semibold py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    Simular 100 Folhas
+                  </button>
                 </div>
 
                 {/* Exportar JSON */}
-                <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-3">
-                  <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
-                    <Download className="w-4 h-4" />
-                    Exportar Backup JSON
+                <div className="bg-[#070B19] p-5 rounded-2xl border border-[#1E2949] flex flex-col justify-between gap-3">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-[#F8F6F0] font-semibold text-sm">
+                      <Download className="w-4 h-4 text-[#F5C451]" />
+                      Exportar Backup JSON
+                    </div>
+                    <p className="text-xs text-[#94A3C8]">
+                      Faz o download de todas as folhas ativas com nomes, sonhos e assinaturas.
+                    </p>
                   </div>
-                  <p className="text-xs text-slate-400">
-                    Faz o download de todas as folhas ativas com nomes, sonhos e assinaturas.
-                  </p>
-                  <div className="pt-6">
-                    <button
-                      onClick={handleExportJson}
-                      className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-2 rounded-lg text-xs transition flex items-center justify-center gap-1.5"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      Baixar Arquivo JSON
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={handleExportJson}
+                    className="w-full bg-[#131C38] hover:bg-[#1B274D] border border-[#2C3C6B] text-[#F8F6F0] font-semibold py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <Download className="w-3.5 h-3.5 text-[#F5C451]" />
+                    Baixar Arquivo JSON
+                  </button>
                 </div>
 
                 {/* Restauração Final Coletiva */}
-                <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-3">
-                  <div className="flex items-center gap-2 text-cyan-400 font-bold text-sm">
-                    <Sparkles className="w-4 h-4" />
-                    Encerramento Feira
+                <div className="bg-[#070B19] p-5 rounded-2xl border border-[#1E2949] flex flex-col justify-between gap-3">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-[#F5C451] font-semibold text-sm">
+                      <Sparkles className="w-4 h-4" />
+                      Encerramento Feira
+                    </div>
+                    <p className="text-xs text-[#94A3C8]">
+                      Restaura e consolida todas as folhas dos 2 dias de feira na árvore gigante.
+                    </p>
                   </div>
-                  <p className="text-xs text-slate-400">
-                    Restaura e consolida todas as folhas dos 2 dias de feira na árvore gigante.
-                  </p>
-                  <div className="pt-6">
-                    <button
-                      onClick={handleRestoreAll}
-                      disabled={adminLoading}
-                      className="w-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold py-2 rounded-lg text-xs transition"
-                    >
-                      Restaurar Todas
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRestoreAll}
+                    disabled={adminLoading}
+                    className="w-full bg-[#D97706] hover:bg-[#EA8C15] text-[#070B19] font-semibold py-2 rounded-lg text-xs transition-colors"
+                  >
+                    Restaurar Todas
+                  </button>
                 </div>
               </div>
 
               {/* Tabela de Moderação das Folhas Ativas */}
               <div className="space-y-3">
-                <h3 className="text-sm font-bold text-slate-300">
+                <h3 className="text-sm font-semibold text-[#CBD5E1]">
                   Moderação em Tempo Real ({folhas.length} folhas na tela)
                 </h3>
-                <div className="bg-slate-950 rounded-2xl border border-slate-800 overflow-x-auto">
+                <div className="bg-[#070B19] rounded-2xl border border-[#1E2949] overflow-x-auto">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-900/80 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+                    <thead className="bg-[#0E152B] text-[#94A3C8] text-[11px] font-medium border-b border-[#1E2949]">
                       <tr>
                         <th className="p-3">Participante</th>
                         <th className="p-3">Profissão</th>
@@ -955,26 +1032,27 @@ export default function App() {
                         <th className="p-3 text-right">Ação</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                    <tbody className="divide-y divide-[#1E2949]/70 text-[#CBD5E1]">
                       {folhas.map((f) => (
-                        <tr key={f.id} className="hover:bg-slate-900/40">
-                          <td className="p-3 font-semibold text-white">{f.nome}</td>
+                        <tr key={f.id} className="hover:bg-[#0E152B]/60 transition-colors">
+                          <td className="p-3 font-semibold text-[#F8F6F0]">{f.nome}</td>
                           <td className="p-3">{f.profissao}</td>
-                          <td className="p-3">
+                          <td className="p-3 font-mono tabular-nums">
                             <span
                               className="inline-block w-3 h-3 rounded-full mr-1.5 align-middle"
                               style={{ backgroundColor: f.cor }}
                             />
                             {f.cor}
                           </td>
-                          <td className="p-3 max-w-xs truncate text-slate-400">
+                          <td className="p-3 max-w-xs truncate text-[#94A3C8]">
                             {f.mensagem || '—'}
                           </td>
                           <td className="p-3 text-right">
                             <button
+                              type="button"
                               onClick={() => handleDeleteFolha(f.id)}
                               disabled={adminLoading}
-                              className="text-rose-400 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 px-2.5 py-1 rounded-lg transition"
+                              className="text-rose-300 hover:text-rose-200 bg-rose-500/10 hover:bg-rose-500/20 px-2.5 py-1 rounded-lg transition-colors"
                             >
                               <Trash2 className="w-3.5 h-3.5 inline mr-1" />
                               Excluir
@@ -994,33 +1072,33 @@ export default function App() {
         {/* ABA 4: DOCUMENTAÇÃO & INTEGRAÇÃO DA API                                    */}
         {/* ========================================================================= */}
         {activeTab === 'docs' && (
-          <div className="max-w-4xl mx-auto w-full space-y-6">
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
-              <div className="space-y-1">
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Code2 className="w-5 h-5 text-emerald-400" />
+          <div className="max-w-4xl mx-auto w-full space-y-6 py-2">
+            <div className="bg-[#0E152B] border border-[#1E2949] rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
+              <div className="space-y-1 border-b border-[#1E2949] pb-4">
+                <h2 className="font-display text-xl font-bold text-[#F8F6F0] flex items-center gap-2.5">
+                  <Code2 className="w-5 h-5 text-[#F5C451]" />
                   Guia de Integração e Especificação da API
                 </h2>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-[#94A3C8]">
                   Documentação oficial completa do Back-End para desenvolvedores e equipe de Front-End.
                 </p>
               </div>
 
               {/* Endpoints */}
               <div className="space-y-4">
-                <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                <div className="bg-[#070B19] p-4 rounded-2xl border border-[#1E2949] space-y-2">
+                  <div className="flex items-center gap-2.5">
+                    <span className="font-mono text-[11px] font-semibold text-[#F5C451]">
                       POST
                     </span>
-                    <span className="font-mono text-xs text-white">/api/folha</span>
-                    <span className="text-xs text-slate-400">— Cadastra nova folha</span>
+                    <span className="font-mono text-xs text-[#F8F6F0]">/api/folha</span>
+                    <span className="text-xs text-[#94A3C8]">— Cadastra nova folha</span>
                   </div>
-                  <pre className="bg-slate-900 p-3 rounded-xl text-[11px] text-slate-300 overflow-x-auto font-mono">
+                  <pre className="bg-[#0E152B] border border-[#1E2949]/60 p-3 rounded-xl text-[11px] text-[#CBD5E1] overflow-x-auto font-mono">
 {`// Payload de envio:
 {
   "nome": "João Silva",
-  "cor": "#10B981",
+  "cor": "#F5C451",
   "profissao": "Desenvolvedor de Software",
   "assinatura": "data:image/png;base64,iVBORw0KGgo...",
   "mensagem": "Construindo o futuro na EEEP!"
@@ -1036,62 +1114,62 @@ export default function App() {
                   </pre>
                 </div>
 
-                <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                <div className="bg-[#070B19] p-4 rounded-2xl border border-[#1E2949] space-y-2">
+                  <div className="flex items-center gap-2.5">
+                    <span className="font-mono text-[11px] font-semibold text-[#7DD3FC]">
                       GET
                     </span>
-                    <span className="font-mono text-xs text-white">/api/folha?limit=100</span>
-                    <span className="text-xs text-slate-400">— Lista as folhas para o telão</span>
+                    <span className="font-mono text-xs text-[#F8F6F0]">/api/folha?limit=100</span>
+                    <span className="text-xs text-[#94A3C8]">— Lista as folhas para o telão</span>
                   </div>
                 </div>
 
-                <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                <div className="bg-[#070B19] p-4 rounded-2xl border border-[#1E2949] space-y-2">
+                  <div className="flex items-center gap-2.5">
+                    <span className="font-mono text-[11px] font-semibold text-amber-300">
                       PATCH
                     </span>
-                    <span className="font-mono text-xs text-white">/api/folha/edit/:token</span>
-                    <span className="text-xs text-slate-400">— Edição permitida durante 15 minutos</span>
+                    <span className="font-mono text-xs text-[#F8F6F0]">/api/folha/edit/:token</span>
+                    <span className="text-xs text-[#94A3C8]">— Edição permitida durante 15 minutos</span>
                   </div>
                 </div>
 
-                <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                <div className="bg-[#070B19] p-4 rounded-2xl border border-[#1E2949] space-y-2">
+                  <div className="flex items-center gap-2.5">
+                    <span className="font-mono text-[11px] font-semibold text-rose-400">
                       DELETE
                     </span>
-                    <span className="font-mono text-xs text-white">/api/admin/folha/:id</span>
-                    <span className="text-xs text-slate-400">— Requer Authorization: Bearer ADMIN_TOKEN</span>
+                    <span className="font-mono text-xs text-[#F8F6F0]">/api/admin/folha/:id</span>
+                    <span className="text-xs text-[#94A3C8]">— Requer Authorization: Bearer ADMIN_TOKEN</span>
                   </div>
                 </div>
               </div>
 
               {/* Eventos Socket.IO */}
               <div className="space-y-3 pt-2">
-                <h3 className="text-sm font-bold text-slate-300">Eventos em Tempo Real (Socket.IO)</h3>
+                <h3 className="text-sm font-semibold text-[#CBD5E1]">Eventos em Tempo Real (Socket.IO)</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-                    <strong className="text-emerald-400 font-mono">folha:created</strong>
-                    <p className="text-slate-400 text-[11px] mt-1">
+                  <div className="bg-[#070B19] p-3.5 rounded-xl border border-[#1E2949]">
+                    <strong className="text-[#F5C451] font-mono">folha:created</strong>
+                    <p className="text-[#94A3C8] text-[11px] mt-1">
                       Emitido quando um participante envia sua folha. O telão a desenha instantaneamente.
                     </p>
                   </div>
-                  <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-                    <strong className="text-blue-400 font-mono">folha:updated</strong>
-                    <p className="text-slate-400 text-[11px] mt-1">
+                  <div className="bg-[#070B19] p-3.5 rounded-xl border border-[#1E2949]">
+                    <strong className="text-[#7DD3FC] font-mono">folha:updated</strong>
+                    <p className="text-[#94A3C8] text-[11px] mt-1">
                       Emitido quando o participante corrige sua folha nos 15 minutos de edição.
                     </p>
                   </div>
-                  <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                  <div className="bg-[#070B19] p-3.5 rounded-xl border border-[#1E2949]">
                     <strong className="text-rose-400 font-mono">folha:deleted</strong>
-                    <p className="text-slate-400 text-[11px] mt-1">
-                      Emitido pelo painel admin. O telão desintegra a folha imprópria em tempo real.
+                    <p className="text-[#94A3C8] text-[11px] mt-1">
+                      Emitido pelo painel admin. O telão remove a folha em tempo real.
                     </p>
                   </div>
-                  <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-                    <strong className="text-amber-400 font-mono">folha:reset</strong>
-                    <p className="text-slate-400 text-[11px] mt-1">
+                  <div className="bg-[#070B19] p-3.5 rounded-xl border border-[#1E2949]">
+                    <strong className="text-amber-300 font-mono">folha:reset</strong>
+                    <p className="text-[#94A3C8] text-[11px] mt-1">
                       Emitido após o backup de sessão. O telão limpa os galhos para a nova turma.
                     </p>
                   </div>
@@ -1103,8 +1181,8 @@ export default function App() {
       </main>
 
       {/* Rodapé Informativo */}
-      <footer className="border-t border-slate-800 bg-slate-900/50 py-3 text-center text-xs text-slate-500">
-        NEUROTREE • Feira de Cursos da EEEP • Back-End Node.js/Express, PostgreSQL, Socket.IO & React
+      <footer className="border-t border-[#1E2949]/80 bg-[#070B19] py-3.5 text-center text-xs text-[#6E80A8]">
+        NEUROTREE · Feira de Cursos da EEEP
       </footer>
     </div>
   );
