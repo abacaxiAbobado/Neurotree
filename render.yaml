@@ -10,24 +10,19 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # Supabase Transaction Pooler (externo) - configure manualmente no dashboard Render
       - key: DB_HOST
-        fromDatabase:
-        property: PGHOST
+        sync: false
       - key: DB_PORT
-        fromDatabase:
-        property: PGPORT
+        sync: false
       - key: DB_NAME
-        fromDatabase:
-        property: PGDATABASE
+        sync: false
       - key: DB_USER
-        fromDatabase:
-        property: PGUSER
+        sync: false
       - key: DB_PASSWORD
-        fromDatabase:
-        property: PGPASSWORD
+        sync: false
       - key: DB_SSL
-        fromDatabase:
-        property: PGSSLMODE
+        sync: false
       - key: ADMIN_PASSWORD_HASH
         sync: false
       - key: JWT_SECRET
@@ -37,10 +32,5 @@ services:
       - key: RATE_LIMIT_DURATION
         value: "60"
 
-databases:
-  - name: neurotree-db
-    databaseName: neurotree
-    user: neurotree_user
-    plan: free
-    postgresMajorVersion: "17"
+# Database removido - usando Supabase externo via pooler
 EOF
