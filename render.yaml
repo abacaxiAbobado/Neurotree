@@ -1,0 +1,44 @@
+services:
+  - type: web
+    name: neurotree-backend
+    env: node
+    region: frankfurt
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: tsx server.ts
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DB_HOST
+        fromDatabase:
+        property: PGHOST
+      - key: DB_PORT
+        fromDatabase:
+        property: PGPORT
+      - key: DB_NAME
+        fromDatabase:
+        property: PGDATABASE
+      - key: DB_USER
+        fromDatabase:
+        property: PGUSER
+      - key: DB_PASSWORD
+        fromDatabase:
+        property: PGPASSWORD
+      - key: DB_SSL
+        fromDatabase:
+        property: PGSSLMODE
+      - key: ADMIN_TOKEN
+        generateValue: true
+      - key: RATE_LIMIT_POINTS
+        value: "60"
+      - key: RATE_LIMIT_DURATION
+        value: "60"
+
+databases:
+  - name: neurotree-db
+    databaseName: neurotree
+    user: neurotree_user
+    plan: free
+    postgresMajorVersion: "17"
+EOF

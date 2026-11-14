@@ -2,6 +2,17 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+// Render managed PostgreSQL provides PGHOST, PGDATABASE, PGUSER, PGPASSWORD, PGPORT, PGSSLMODE
+// Railway provides PGHOST, PGDATABASE, PGUSER, PGPASSWORD, PGPORT, PGSSLMODE (similar)
+// Supabase provides DATABASE_URL and optionally DB_HOST, DB_PORT, etc.
+// Fallback to Render managed PG env vars for IPv4 connections (connectionString uses IPv6)
+const dbHost = process.env.DB_HOST || process.env.PGHOST || 'localhost';
+const dbPort = process.env.DB_PORT || process.env.PGPORT || '5432';
+const dbName = process.env.DB_NAME || process.env.PGDATABASE || 'neurotree';
+const dbUser = process.env.DB_USER || process.env.PGUSER || 'postgres';
+const dbPassword = process.env.DB_PASSWORD || process.env.PGPASSWORD || '';
+const dbSslMode = process.env.DB_SSL || process.env.PGSSLMODE || '';
+
 export const config = {
   port: parseInt(
     process.env.APP_PORT ||
@@ -10,15 +21,17 @@ export const config = {
   ),
   nodeEnv: process.env.NODE_ENV || 'development',
   isProduction: process.env.NODE_ENV === 'production',
-  
+
   // Database configuration
+  // Render managed PG connection string (DATABASE_URL) usa IPv6 hostnames
+  // Usamos variáveis individuais (DB_HOST, PGHOST, etc.) para forçar IPv4
   databaseUrl: process.env.DATABASE_URL || '',
-  dbHost: process.env.DB_HOST || 'localhost',
-  dbPort: parseInt(process.env.DB_PORT || '5432', 10),
-  dbName: process.env.DB_NAME || 'neurotree',
-  dbUser: process.env.DB_USER || 'neurotree_user',
-  dbPassword: process.env.DB_PASSWORD || '',
-  dbSsl: process.env.DB_SSL === 'true',
+  dbHost,
+  dbPort: parseInt(dbPort, 10),
+  dbName,
+  dbUser,
+  dbPassword,
+  dbSsl: dbSslMode === 'require' || dbSslMode === 'verify-full',
 
   // Admin security token
   adminToken: process.env.ADMIN_TOKEN || 'neurotree_admin_secret_2026',
