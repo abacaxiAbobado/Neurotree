@@ -22,6 +22,7 @@ import {
   Lock,
   LogOut,
   Unlock,
+  X,
 } from 'lucide-react';
 
 export interface Folha {
@@ -49,7 +50,8 @@ const PRESET_COLORS = [
 ];
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'telao' | 'formulario' | 'admin' | 'docs'>('telao');
+  const [activeTab, setActiveTab] = useState<'telao' | 'formulario'>('telao');
+  const [showAdminModal, setShowAdminModal] = useState(false);
   const [folhas, setFolhas] = useState<Folha[]>([]);
   const [selectedFolha, setSelectedFolha] = useState<Folha | null>(null);
   const [socketConnected, setSocketConnected] = useState(false);
@@ -613,40 +615,6 @@ export default function App() {
                 }`}
               />
               <span>Contribuir</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('admin')}
-              className={`relative h-full px-1 text-xs md:text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap shrink-0 border-b-2 ${
-                activeTab === 'admin'
-                  ? 'border-[#F5C451] text-[#F8F6F0] font-semibold'
-                  : 'border-transparent text-[#94A3C8] hover:text-[#F8F6F0] hover:border-[#334678]'
-              }`}
-            >
-              <ShieldAlert
-                className={`w-4 h-4 shrink-0 ${
-                  activeTab === 'admin' ? 'text-[#F5C451]' : 'text-[#7385AD]'
-                }`}
-              />
-              <span>Gestão da Feira</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('docs')}
-              className={`relative h-full px-1 text-xs md:text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap shrink-0 border-b-2 ${
-                activeTab === 'docs'
-                  ? 'border-[#F5C451] text-[#F8F6F0] font-semibold'
-                  : 'border-transparent text-[#94A3C8] hover:text-[#F8F6F0] hover:border-[#334678]'
-              }`}
-            >
-              <Code2
-                className={`w-4 h-4 shrink-0 ${
-                  activeTab === 'docs' ? 'text-[#F5C451]' : 'text-[#7385AD]'
-                }`}
-              />
-              <span>API Docs</span>
             </button>
           </nav>
 
@@ -1295,9 +1263,246 @@ export default function App() {
       </main>
 
       {/* Rodapé Informativo */}
-      <footer className="border-t border-[#1E2949]/80 bg-[#070B19] py-3.5 text-center text-xs text-[#6E80A8]">
-        NEUROTREE · Feira de Cursos da EEEP
+      <footer className="border-t border-[#1E2949]/80 bg-[#070B19] py-3.5">
+        <div className="max-w-7xl mx-auto px-4 flex items-center justify-between">
+          <span className="text-xs text-[#6E80A8]">NEUROTREE · Feira de Cursos da EEEP</span>
+          <button
+            type="button"
+            onClick={() => setShowAdminModal(true)}
+            className="p-1.5 rounded-lg text-[#334678] hover:text-[#F5C451] hover:bg-[#131C38] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F5C451]"
+            aria-label="Acesso administrativo"
+            title="Gestão da Feira"
+          >
+            <Lock className="w-4 h-4" />
+          </button>
+        </div>
       </footer>
+
+      {/* Modal de Login Admin (Discreto - Cadeado no Rodapé) */}
+      {showAdminModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#070B19]/95 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-[#0E152B] border border-[#1E2949] rounded-3xl p-6 md:p-8 shadow-2xl space-y-6 animate-fade-in">
+            <button
+              type="button"
+              onClick={() => setShowAdminModal(false)}
+              className="absolute top-4 right-4 p-1 rounded-lg text-[#566894] hover:text-[#F8F6F0] hover:bg-[#131C38] transition-colors"
+              aria-label="Fechar"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="text-center space-y-2">
+              <Lock className="w-10 h-10 text-[#F5C451] mx-auto" />
+              <h3 className="font-display text-lg font-bold text-[#F8F6F0]">Acesso Restrito</h3>
+              <p className="text-xs text-[#94A3C8]">Digite a senha de administrador para acessar o painel de gestão.</p>
+            </div>
+            <form onSubmit={handleAdminLogin} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-[#CBD5E1]">Senha de Administrador</label>
+                <input
+                  type="password"
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
+                  placeholder="Digite a senha"
+                  autoComplete="current-password"
+                  required
+                  autoFocus
+                  className="w-full bg-[#070B19] border border-[#1E2949] rounded-xl px-4 py-2.5 text-sm text-[#F8F6F0] placeholder-[#566894] focus:outline-none focus:border-[#F5C451] transition-colors"
+                />
+              </div>
+              {adminMessage && (
+                <div className="text-xs text-center px-3 py-2 rounded-lg border
+                  {adminMessage.includes('✅')
+                    ? 'bg-green-500/10 border-green-500/30 text-green-300'
+                    : 'bg-rose-500/10 border-rose-500/30 text-rose-300'}">
+                  {adminMessage}
+                </div>
+              )}
+              <button
+                type="submit"
+                disabled={adminLoading}
+                className="w-full bg-gradient-to-r from-[#F5C451] to-[#D97706] hover:from-[#F7D06D] hover:to-[#E58A1A] text-[#070B19] font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2 shadow-[0_8px_24px_rgba(245,196,81,0.22)] disabled:opacity-50"
+              >
+                {adminLoading ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Unlock className="w-4 h-4" />
+                )}
+                {adminLoading ? 'Entrando...' : 'Acessar Painel'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {adminAuthed && showAdminModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#070B19]/95 backdrop-blur-sm">
+          <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-[#0E152B] border border-[#1E2949] rounded-3xl p-6 md:p-8 shadow-2xl animate-fade-in">
+            <div className="flex items-center justify-between border-b border-[#1E2949] pb-4 gap-4 flex-wrap mb-6">
+              <div className="space-y-1">
+                <h2 className="font-display text-xl font-bold text-[#F8F6F0] flex items-center gap-2.5">
+                  <ShieldAlert className="w-5 h-5 text-[#F5C451]" />
+                  Painel de Moderação & Gestão de Sessões
+                </h2>
+                <p className="text-xs text-[#94A3C8]">Controle oficial para os organizadores da Feira de Cursos (EEEP).</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAdminModal(false)}
+                  className="p-1.5 rounded-lg text-[#566894] hover:text-[#F8F6F0] hover:bg-[#131C38] transition-colors"
+                  aria-label="Fechar painel"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAdminLogout}
+                  disabled={adminLoading}
+                  className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  Sair
+                </button>
+              </div>
+            </div>
+
+            {adminMessage && (
+              <div className="bg-[#131C38] border border-[#2C3C6B] p-4 rounded-2xl text-xs text-[#F8F6F0] mb-6">
+                {adminMessage}
+              </div>
+            )}
+
+            {/* Ações Rápidas da Feira */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              {/* Reset para Nova Turma */}
+              <div className="bg-[#070B19] p-5 rounded-2xl border border-[#1E2949] flex flex-col justify-between gap-3">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-[#F5C451] font-semibold text-sm">
+                    <RotateCcw className="w-4 h-4" />
+                    Nova Turma
+                  </div>
+                  <p className="text-xs text-[#94A3C8]">Gera backup automático da turma atual e limpa a tela para os próximos alunos.</p>
+                  <input
+                    type="text"
+                    value={resetTurmaLabel}
+                    onChange={(e) => setResetTurmaLabel(e.target.value)}
+                    placeholder="Nome da Turma"
+                    className="w-full bg-[#0E152B] border border-[#1E2949] rounded-lg px-3 py-1.5 text-xs text-[#F8F6F0] focus:outline-none focus:border-[#F5C451]"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleResetTree}
+                  disabled={adminLoading}
+                  className="w-full bg-[#F5C451] hover:bg-[#F7D06D] text-[#070B19] font-semibold py-2 rounded-lg text-xs transition-colors"
+                >
+                  Resetar Árvore
+                </button>
+              </div>
+
+              {/* Simulação em Massa (100 Folhas) */}
+              <div className="bg-[#070B19] p-5 rounded-2xl border border-[#1E2949] flex flex-col justify-between gap-3">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-[#7DD3FC] font-semibold text-sm">
+                    <Zap className="w-4 h-4" />
+                    Simulação (100 Folhas)
+                  </div>
+                  <p className="text-xs text-[#94A3C8]">Gera instantaneamente 100 contribuições com sonhos e cores para teste do telão.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSimulateLeaves}
+                  disabled={adminLoading}
+                  className="w-full bg-[#131C38] hover:bg-[#1B274D] border border-[#38BDF8]/40 text-[#7DD3FC] font-semibold py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  Simular 100 Folhas
+                </button>
+              </div>
+
+              {/* Exportar JSON */}
+              <div className="bg-[#070B19] p-5 rounded-2xl border border-[#1E2949] flex flex-col justify-between gap-3">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-[#F8F6F0] font-semibold text-sm">
+                    <Download className="w-4 h-4 text-[#F5C451]" />
+                    Exportar Backup JSON
+                  </div>
+                  <p className="text-xs text-[#94A3C8]">Faz o download de todas as folhas ativas com nomes, sonhos e assinaturas.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleExportJson}
+                  className="w-full bg-[#131C38] hover:bg-[#1B274D] border border-[#2C3C6B] text-[#F8F6F0] font-semibold py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <Download className="w-3.5 h-3.5 text-[#F5C451]" />
+                  Baixar Arquivo JSON
+                </button>
+              </div>
+
+              {/* Restauração Final Coletiva */}
+              <div className="bg-[#070B19] p-5 rounded-2xl border border-[#1E2949] flex flex-col justify-between gap-3">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-[#F5C451] font-semibold text-sm">
+                    <Sparkles className="w-4 h-4" />
+                    Encerramento Feira
+                  </div>
+                  <p className="text-xs text-[#94A3C8]">Restaura e consolida todas as folhas dos 2 dias de feira na árvore gigante.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRestoreAll}
+                  disabled={adminLoading}
+                  className="w-full bg-[#D97706] hover:bg-[#EA8C15] text-[#070B19] font-semibold py-2 rounded-lg text-xs transition-colors"
+                >
+                  Restaurar Todas
+                </button>
+              </div>
+            </div>
+
+            {/* Tabela de Moderação das Folhas Ativas */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-[#CBD5E1]">Moderação em Tempo Real ({folhas.length} folhas na tela)</h3>
+              <div className="bg-[#070B19] rounded-2xl border border-[#1E2949] overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-[#0E152B] text-[#94A3C8] text-[11px] font-medium border-b border-[#1E2949]">
+                    <tr>
+                      <th className="p-3">Participante</th>
+                      <th className="p-3">Profissão</th>
+                      <th className="p-3">Cor</th>
+                      <th className="p-3">Mensagem</th>
+                      <th className="p-3 text-right">Ação</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#1E2949]/70 text-[#CBD5E1]">
+                    {folhas.map((f) => (
+                      <tr key={f.id} className="hover:bg-[#0E152B]/60 transition-colors">
+                        <td className="p-3 font-semibold text-[#F8F6F0]">{f.nome}</td>
+                        <td className="p-3">{f.profissao}</td>
+                        <td className="p-3 font-mono tabular-nums">
+                          <span className="inline-block w-3 h-3 rounded-full mr-1.5 align-middle" style={{ backgroundColor: f.cor }} />
+                          {f.cor}
+                        </td>
+                        <td className="p-3 max-w-xs truncate text-[#94A3C8]">{f.mensagem || '—'}</td>
+                        <td className="p-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteFolha(f.id)}
+                            disabled={adminLoading}
+                            className="text-rose-300 hover:text-rose-200 bg-rose-500/10 hover:bg-rose-500/20 px-2.5 py-1 rounded-lg transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 inline mr-1" />
+                            Excluir
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
