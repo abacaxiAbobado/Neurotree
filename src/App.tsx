@@ -23,6 +23,8 @@ import {
   LogOut,
   Unlock,
   X,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 export interface Folha {
@@ -52,6 +54,7 @@ const PRESET_COLORS = [
 export default function App() {
   const [activeTab, setActiveTab] = useState<'telao' | 'formulario'>('telao');
   const [showAdminModal, setShowAdminModal] = useState(false);
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
   const [folhas, setFolhas] = useState<Folha[]>([]);
   const [selectedFolha, setSelectedFolha] = useState<Folha | null>(null);
   const [socketConnected, setSocketConnected] = useState(false);
@@ -964,15 +967,25 @@ export default function App() {
                       <label className="text-xs font-semibold text-[#CBD5E1]">
                         Senha de Administrador
                       </label>
-                      <input
-                        type="password"
-                        value={adminPassword}
-                        onChange={(e) => setAdminPassword(e.target.value)}
-                        placeholder="Digite a senha"
-                        autoComplete="current-password"
-                        required
-                        className="w-full bg-[#070B19] border border-[#1E2949] rounded-xl px-4 py-2.5 text-sm text-[#F8F6F0] placeholder-[#566894] focus:outline-none focus:border-[#F5C451] transition-colors"
-                      />
+                      <div className="relative">
+                        <input
+                          type={showAdminPassword ? 'text' : 'password'}
+                          value={adminPassword}
+                          onChange={(e) => setAdminPassword(e.target.value)}
+                          placeholder="Digite a senha"
+                          autoComplete="current-password"
+                          required
+                          className="w-full bg-[#070B19] border border-[#1E2949] rounded-xl px-4 py-2.5 text-sm text-[#F8F6F0] placeholder-[#566894] focus:outline-none focus:border-[#F5C451] transition-colors pr-12"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowAdminPassword(!showAdminPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#566894] hover:text-[#F5C451] transition-colors"
+                          aria-label={showAdminPassword ? 'Ocultar senha' : 'Exibir senha'}
+                        >
+                          {showAdminPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                        </button>
+                      </div>
                     </div>
                     <button
                       type="submit"
@@ -1298,16 +1311,26 @@ export default function App() {
             <form onSubmit={handleAdminLogin} className="space-y-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-[#CBD5E1]">Senha de Administrador</label>
-                <input
-                  type="password"
-                  value={adminPassword}
-                  onChange={(e) => setAdminPassword(e.target.value)}
-                  placeholder="Digite a senha"
-                  autoComplete="current-password"
-                  required
-                  autoFocus
-                  className="w-full bg-[#070B19] border border-[#1E2949] rounded-xl px-4 py-2.5 text-sm text-[#F8F6F0] placeholder-[#566894] focus:outline-none focus:border-[#F5C451] transition-colors"
-                />
+                <div className="relative">
+                  <input
+                    type={showAdminPassword ? 'text' : 'password'}
+                    value={adminPassword}
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                    placeholder="Digite a senha"
+                    autoComplete="current-password"
+                    required
+                    autoFocus
+                    className="w-full bg-[#070B19] border border-[#1E2949] rounded-xl px-4 py-2.5 text-sm text-[#F8F6F0] placeholder-[#566894] focus:outline-none focus:border-[#F5C451] transition-colors pr-12"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowAdminPassword(!showAdminPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#566894] hover:text-[#F5C451] transition-colors"
+                    aria-label={showAdminPassword ? 'Ocultar senha' : 'Exibir senha'}
+                  >
+                    {showAdminPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
               </div>
               {adminMessage && (
                 <div className="text-xs text-center px-3 py-2 rounded-lg border
