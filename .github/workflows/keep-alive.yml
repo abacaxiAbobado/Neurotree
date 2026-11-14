@@ -1,0 +1,18 @@
+name: Keep Render Alive
+
+on:
+  schedule:
+    # Runs every 10 minutes (prevents 15-min spin-down on Render free tier)
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render health endpoint
+        run: |
+          curl -fsS --max-time 30 "https://neurotree-backend.onrender.com/api/health" \
+            -H "Accept: application/json" \
+            -w "\nHTTP %{http_code} - %{time_total}s\n"
+        continue-on-error: true
