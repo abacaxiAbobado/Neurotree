@@ -53,3 +53,13 @@ body {
     transform: scale(1);
   }
 }
+
+/* Esconde a barra de rolagem da navegação horizontal (rolagem continua funcionando) */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

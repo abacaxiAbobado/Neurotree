@@ -2457,10 +2457,14 @@ export function NeuralTree({
   return (
     <div
       ref={containerRef}
-      className={`relative overflow-hidden select-none bg-[#070B19] flex flex-col justify-between transition-all ${
+      // `isolate` cria um contexto de empilhamento próprio: os z-index internos da árvore
+      // (HUD, cartão, tooltip, folhas) deixam de competir com o cabeçalho fixo da página.
+      // A altura desconta cabeçalho, barra de estado, margens e rodapé (~15rem) para o palco
+      // caber na tela sem precisar rolar.
+      className={`relative isolate overflow-hidden select-none bg-[#070B19] flex flex-col justify-between transition-all ${
         isFullscreen
           ? 'fixed inset-0 z-50 h-screen w-screen'
-          : 'w-full rounded-3xl border border-[#1E2949] shadow-2xl min-h-[660px] h-[78vh]'
+          : 'w-full rounded-3xl border border-[#1E2949] shadow-2xl min-h-[600px] h-[calc(100dvh-15rem)]'
       }`}
     >
       {/* 1. Canvas Central Cósmico: Vazio do Fim dos Tempos, Tronco de Fios Trançados e Galhos de Yggdrasil */}

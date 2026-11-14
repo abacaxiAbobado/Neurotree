@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { NeuralTree } from './components/NeuralTree.tsx';
+import { AdminLogin } from './components/AdminLogin.tsx';
+import { ConfirmModal, type ConfirmRequest } from './components/ConfirmModal.tsx';
 import {
   TreeDeciduous,
   Send,
@@ -19,6 +21,10 @@ import {
   ExternalLink,
   Code2,
   Zap,
+  ShieldCheck,
+  Lock,
+  LogOut,
+  type LucideIcon,
 } from 'lucide-react';
 
 export interface Folha {
@@ -45,8 +51,20 @@ const PRESET_COLORS = [
   { name: 'Turquesa Astral', hex: '#2DD4BF', darkCheck: true },
 ];
 
+const ADMIN_SESSION_KEY = 'neurotree_admin_session';
+
+type TabId = 'telao' | 'formulario' | 'admin' | 'docs';
+
+// Abas marcadas com adminOnly só aparecem para quem entrou como administrador
+const NAV_TABS: { id: TabId; label: string; icon: LucideIcon; adminOnly?: boolean }[] = [
+  { id: 'telao', label: 'Telão da Árvore', icon: TreeDeciduous },
+  { id: 'formulario', label: 'Contribuir', icon: Send },
+  { id: 'admin', label: 'Gestão da Feira', icon: ShieldAlert, adminOnly: true },
+  { id: 'docs', label: 'API Docs', icon: Code2, adminOnly: true },
+];
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'telao' | 'formulario' | 'admin' | 'docs'>('telao');
+  const [activeTab, setActiveTab] = useState<TabId>('telao');
   const [folhas, setFolhas] = useState<Folha[]>([]);
   const [selectedFolha, setSelectedFolha] = useState<Folha | null>(null);
   const [socketConnected, setSocketConnected] = useState(false);
@@ -71,8 +89,17 @@ export default function App() {
   const [editRemainingTime, setEditRemainingTime] = useState<string>('');
 
   // Painel Admin
-  const [adminTokenInput, setAdminTokenInput] = useState('neurotree_admin_secret_2026');
-  const [adminAuthed, setAdminAuthed] = useState(false);
+  // Sessão de administrador: o token fica só na aba atual (sessionStorage)
+  const [adminToken, setAdminToken] = useState<string | null>(() => {
+    try {
+      return sessionStorage.getItem(ADMIN_SESSION_KEY);
+    } catch {
+      return null;
+    }
+  });
+  const isAdmin = adminToken !== null;
+  const [loginNotice, setLoginNotice] = useState<string | null>(null);
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const [adminMessage, setAdminMessage] = useState<string | null>(null);
   const [resetTurmaLabel, setResetTurmaLabel] = useState('Turma 3º Ano Informática');
   const [adminLoading, setAdminLoading] = useState(false);
@@ -187,6 +214,73 @@ export default function App() {
 
     return () => clearInterval(interval);
   }, [myEditExpiresAt]);
+
+  // Páginas restritas: quem não é admin não permanece na documentação da API
+  useEffect(() => {
+    if (!isAdmin && activeTab === 'docs') setActiveTab('telao');
+  }, [isAdmin, activeTab]);
+
+  const adminLogin = async (token: string): Promise<string | null> => {
+    try {
+      // Valida o token numa rota administrativa já existente (GET exige Authorization: Bearer)
+      const res = await fetch('/api/admin/backups', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.status === 401 || res.status === 403) {
+        return 'Token inválido. Confira e tente novamente.';
+      }
+      if (!res.ok) {
+        return 'O servidor não conseguiu validar o token agora. Tente novamente em instantes.';
+      }
+      try {
+        sessionStorage.setItem(ADMIN_SESSION_KEY, token);
+      } catch {
+        // sessionStorage indisponível: a sessão vale só até recarregar a página
+      }
+      setAdminToken(token);
+      setLoginNotice(null);
+      setAdminMessage(null);
+      setActiveTab('admin');
+      return null;
+    } catch {
+      return 'Sem conexão com o servidor. Verifique a rede e tente novamente.';
+    }
+  };
+
+  const adminLogout = (options?: { expired?: boolean }) => {
+    try {
+      sessionStorage.removeItem(ADMIN_SESSION_KEY);
+    } catch {
+      // ignora
+    }
+    setAdminToken(null);
+    setAdminMessage(null);
+    setConfirmRequest(null);
+    if (options?.expired) {
+      // Mantém na tela de login, explicando o motivo
+      setLoginNotice('Sua sessão administrativa expirou ou o token deixou de ser válido. Entre novamente.');
+      setActiveTab('admin');
+    } else {
+      setLoginNotice(null);
+      setActiveTab((tab) => (tab === 'admin' || tab === 'docs' ? 'telao' : tab));
+    }
+  };
+
+  // Todas as chamadas administrativas passam por aqui; 401/403 encerram a sessão
+  const adminRequest = async (path: string, init: RequestInit = {}): Promise<Response> => {
+    const res = await fetch(path, {
+      ...init,
+      headers: {
+        ...((init.headers as Record<string, string> | undefined) ?? {}),
+        Authorization: `Bearer ${adminToken ?? ''}`,
+      },
+    });
+    if (res.status === 401 || res.status === 403) {
+      adminLogout({ expired: true });
+      throw new Error('Sessão administrativa inválida ou expirada.');
+    }
+    return res;
+  };
 
   const fetchHealth = async () => {
     try {
@@ -375,14 +469,20 @@ export default function App() {
   };
 
   // Ações Administrativas
-  const handleDeleteFolha = async (id: string) => {
-    if (!window.confirm('Tem certeza que deseja excluir esta folha?')) return;
+  const handleDeleteFolha = (folha: Folha) => {
+    setConfirmRequest({
+      title: 'Excluir esta folha?',
+      message: `A folha de "${folha.nome}" será removida da árvore. Essa ação não pode ser desfeita.`,
+      confirmLabel: 'Excluir folha',
+      tone: 'danger',
+      onConfirm: () => performDeleteFolha(folha.id),
+    });
+  };
+
+  const performDeleteFolha = async (id: string) => {
     setAdminLoading(true);
     try {
-      const res = await fetch(`/api/admin/folha/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${adminTokenInput}` },
-      });
+      const res = await adminRequest(`/api/admin/folha/${id}`, { method: 'DELETE' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
       setAdminMessage(`✅ Folha ${id} removida com sucesso.`);
@@ -393,22 +493,22 @@ export default function App() {
     }
   };
 
-  const handleResetTree = async () => {
-    if (
-      !window.confirm(
-        `Resetar a árvore agora? Um backup automático da sessão "${resetTurmaLabel}" será salvo.`
-      )
-    )
-      return;
+  const handleResetTree = () => {
+    setConfirmRequest({
+      title: 'Resetar a árvore?',
+      message: `Um backup da sessão "${resetTurmaLabel}" será salvo no servidor e a árvore ficará vazia para a próxima turma. Se quiser uma cópia sua, exporte o JSON antes.`,
+      confirmLabel: 'Resetar árvore',
+      tone: 'danger',
+      onConfirm: performResetTree,
+    });
+  };
 
+  const performResetTree = async () => {
     setAdminLoading(true);
     try {
-      const res = await fetch('/api/admin/reset', {
+      const res = await adminRequest('/api/admin/reset', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${adminTokenInput}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ label: resetTurmaLabel }),
       });
       const data = await res.json();
@@ -423,20 +523,21 @@ export default function App() {
     }
   };
 
-  const handleRestoreAll = async () => {
-    if (
-      !window.confirm(
-        'Deseja restaurar todas as folhas arquivadas de todos os backups para o encerramento da feira?'
-      )
-    )
-      return;
+  const handleRestoreAll = () => {
+    setConfirmRequest({
+      title: 'Restaurar todas as folhas?',
+      message:
+        'Todas as folhas dos backups salvos voltarão para a árvore, para o encerramento da feira. Folhas que já estão na árvore não são duplicadas.',
+      confirmLabel: 'Restaurar todas',
+      tone: 'warning',
+      onConfirm: performRestoreAll,
+    });
+  };
 
+  const performRestoreAll = async () => {
     setAdminLoading(true);
     try {
-      const res = await fetch('/api/admin/restore', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${adminTokenInput}` },
-      });
+      const res = await adminRequest('/api/admin/restore', { method: 'POST' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
       setAdminMessage(
@@ -455,19 +556,43 @@ export default function App() {
     }
   };
 
-  const handleExportJson = () => {
-    window.location.href = `/api/admin/export?token=${encodeURIComponent(adminTokenInput)}`;
+  const handleExportJson = async () => {
+    setAdminLoading(true);
+    try {
+      // O back só aceita o token no cabeçalho Authorization, então baixamos via fetch + blob
+      const res = await adminRequest('/api/admin/export');
+      if (!res.ok) {
+        let message = 'Falha ao exportar as folhas.';
+        try {
+          message = (await res.json()).message || message;
+        } catch {
+          // resposta sem JSON
+        }
+        throw new Error(message);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `neurotree_export_${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setAdminMessage('✅ Exportação concluída: o arquivo JSON foi baixado.');
+    } catch (err: any) {
+      setAdminMessage(`❌ Erro ao exportar: ${err.message}`);
+    } finally {
+      setAdminLoading(false);
+    }
   };
 
   const handleSimulateLeaves = async () => {
     setAdminLoading(true);
     try {
-      const res = await fetch('/api/admin/simulate', {
+      const res = await adminRequest('/api/admin/simulate', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${adminTokenInput}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ count: 100 }),
       });
       const data = await res.json();
@@ -503,7 +628,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#070B19] text-[#F8F6F0] flex flex-col selection:bg-[#F5C451] selection:text-[#070B19]">
       {/* Barra de Navegação Superior — Contrato Limpo em 3 Zonas + Abas com Linha Indicadora Ativa */}
-      <header className="border-b border-[#1E2949] bg-[#0A1024]/90 backdrop-blur-md sticky top-0 z-30">
+      <header className="border-b border-[#1E2949] bg-[#0A1024]/90 backdrop-blur-md sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between gap-6">
           {/* Zona 1: Marca em linha única */}
           <button
@@ -517,90 +642,66 @@ export default function App() {
             </span>
           </button>
 
-          {/* Zona 2: Abas limpas com linha indicadora dourada ativa */}
+          {/* Zona 2: Abas limpas com linha indicadora dourada ativa (abas de gestão só para admins) */}
           <nav
             aria-label="Navegação principal"
-            className="flex items-stretch h-16 gap-5 md:gap-7 overflow-x-auto no-scrollbar"
+            className="flex items-stretch h-16 gap-5 md:gap-7 overflow-x-auto no-scrollbar min-w-0"
           >
-            <button
-              type="button"
-              onClick={() => setActiveTab('telao')}
-              className={`relative h-full px-1 text-xs md:text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap shrink-0 border-b-2 ${
-                activeTab === 'telao'
-                  ? 'border-[#F5C451] text-[#F8F6F0] font-semibold'
-                  : 'border-transparent text-[#94A3C8] hover:text-[#F8F6F0] hover:border-[#334678]'
-              }`}
-            >
-              <TreeDeciduous
-                className={`w-4 h-4 shrink-0 ${
-                  activeTab === 'telao' ? 'text-[#F5C451]' : 'text-[#7385AD]'
+            {NAV_TABS.filter((tab) => !tab.adminOnly || isAdmin).map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setActiveTab(id)}
+                aria-current={activeTab === id ? 'page' : undefined}
+                className={`relative h-full px-1 text-xs md:text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap shrink-0 border-b-2 ${
+                  activeTab === id
+                    ? 'border-[#F5C451] text-[#F8F6F0] font-semibold'
+                    : 'border-transparent text-[#94A3C8] hover:text-[#F8F6F0] hover:border-[#334678]'
                 }`}
-              />
-              <span>Telão da Árvore</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('formulario')}
-              className={`relative h-full px-1 text-xs md:text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap shrink-0 border-b-2 ${
-                activeTab === 'formulario'
-                  ? 'border-[#F5C451] text-[#F8F6F0] font-semibold'
-                  : 'border-transparent text-[#94A3C8] hover:text-[#F8F6F0] hover:border-[#334678]'
-              }`}
-            >
-              <Send
-                className={`w-4 h-4 shrink-0 ${
-                  activeTab === 'formulario' ? 'text-[#F5C451]' : 'text-[#7385AD]'
-                }`}
-              />
-              <span>Contribuir</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('admin')}
-              className={`relative h-full px-1 text-xs md:text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap shrink-0 border-b-2 ${
-                activeTab === 'admin'
-                  ? 'border-[#F5C451] text-[#F8F6F0] font-semibold'
-                  : 'border-transparent text-[#94A3C8] hover:text-[#F8F6F0] hover:border-[#334678]'
-              }`}
-            >
-              <ShieldAlert
-                className={`w-4 h-4 shrink-0 ${
-                  activeTab === 'admin' ? 'text-[#F5C451]' : 'text-[#7385AD]'
-                }`}
-              />
-              <span>Gestão da Feira</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('docs')}
-              className={`relative h-full px-1 text-xs md:text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap shrink-0 border-b-2 ${
-                activeTab === 'docs'
-                  ? 'border-[#F5C451] text-[#F8F6F0] font-semibold'
-                  : 'border-transparent text-[#94A3C8] hover:text-[#F8F6F0] hover:border-[#334678]'
-              }`}
-            >
-              <Code2
-                className={`w-4 h-4 shrink-0 ${
-                  activeTab === 'docs' ? 'text-[#F5C451]' : 'text-[#7385AD]'
-                }`}
-              />
-              <span>API Docs</span>
-            </button>
+              >
+                <Icon
+                  className={`w-4 h-4 shrink-0 ${
+                    activeTab === id ? 'text-[#F5C451]' : 'text-[#7385AD]'
+                  }`}
+                />
+                <span>{label}</span>
+              </button>
+            ))}
           </nav>
 
-          {/* Zona 3: Ação Principal */}
-          <div className="hidden sm:flex items-center shrink-0">
-            <button
-              type="button"
-              onClick={() => setActiveTab('formulario')}
-              className="bg-[#F5C451] hover:bg-[#F7D06D] text-[#070B19] font-semibold px-4 py-2 rounded-lg text-xs transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 shadow-[0_4px_20px_rgba(245,196,81,0.18)]"
-            >
-              <Send className="w-3.5 h-3.5" />
-              <span>Plantar Folha</span>
-            </button>
+          {/* Zona 3: Selo de admin + Ação Principal */}
+          <div className="flex items-center gap-2 shrink-0">
+            {isAdmin && (
+              <>
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[#D97706]/50 bg-[#D97706]/10 px-2 sm:px-2.5 py-1 text-[11px] font-semibold tracking-wider text-[#F59E0B]"
+                  title="Sessão de administrador ativa"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span className="hidden sm:inline">ADMIN</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => adminLogout()}
+                  aria-label="Sair do modo administrador"
+                  title="Sair do modo administrador"
+                  className="p-2 rounded-lg text-xs text-[#94A3C8] hover:text-[#F8F6F0] hover:bg-[#131C38] border border-transparent hover:border-[#2C3C6B] transition-colors flex items-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F5C451]"
+                >
+                  <LogOut className="w-4 h-4" aria-hidden="true" />
+                  <span className="hidden md:inline">Sair</span>
+                </button>
+              </>
+            )}
+            <div className="hidden sm:flex items-center">
+              <button
+                type="button"
+                onClick={() => setActiveTab('formulario')}
+                className="bg-[#F5C451] hover:bg-[#F7D06D] text-[#070B19] font-semibold px-4 py-2 rounded-lg text-xs transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 shadow-[0_4px_20px_rgba(245,196,81,0.18)]"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Plantar Folha</span>
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -888,7 +989,11 @@ export default function App() {
         {/* ========================================================================= */}
         {/* ABA 3: PAINEL DE GESTÃO DA FEIRA & ADMIN                                  */}
         {/* ========================================================================= */}
-        {activeTab === 'admin' && (
+        {activeTab === 'admin' && !isAdmin && (
+          <AdminLogin onLogin={adminLogin} notice={loginNotice} />
+        )}
+
+        {activeTab === 'admin' && isAdmin && (
           <div className="max-w-5xl mx-auto w-full space-y-6 py-2">
             <div className="bg-[#0E152B] border border-[#1E2949] rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
               <div className="flex items-center justify-between border-b border-[#1E2949] pb-4 gap-4 flex-wrap">
@@ -901,17 +1006,19 @@ export default function App() {
                     Controle oficial para os organizadores da Feira de Cursos (EEEP).
                   </p>
                 </div>
-                <div className="flex items-center gap-2.5">
-                  <input
-                    type="password"
-                    value={adminTokenInput}
-                    onChange={(e) => setAdminTokenInput(e.target.value)}
-                    placeholder="ADMIN_TOKEN"
-                    className="bg-[#070B19] border border-[#1E2949] rounded-lg px-3 py-1.5 text-xs text-[#F8F6F0] focus:outline-none focus:border-[#F5C451]"
-                  />
-                  <span className="text-xs font-medium text-[#F5C451]">
-                    Token ativo
+                <div className="flex items-center gap-3">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[#F59E0B]">
+                    <span className="w-2 h-2 rounded-full bg-[#F59E0B]" aria-hidden="true" />
+                    Sessão de administrador ativa
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => adminLogout()}
+                    className="flex items-center gap-1.5 text-xs font-medium text-[#CBD5E1] hover:text-[#F8F6F0] bg-[#131C38] hover:bg-[#1B274D] border border-[#2C3C6B] px-3 py-1.5 rounded-lg transition-colors"
+                  >
+                    <LogOut className="w-3.5 h-3.5" aria-hidden="true" />
+                    Sair
+                  </button>
                 </div>
               </div>
 
@@ -921,100 +1028,126 @@ export default function App() {
                 </div>
               )}
 
-              {/* Ações Rápidas da Feira */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Reset para Nova Turma */}
-                <div className="bg-[#070B19] p-5 rounded-2xl border border-[#1E2949] flex flex-col justify-between gap-3">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-[#F5C451] font-semibold text-sm">
-                      <RotateCcw className="w-4 h-4" />
-                      Nova Turma
+              {/* Ferramentas (seguras) */}
+              <section aria-labelledby="admin-tools" className="space-y-3">
+                <h3
+                  id="admin-tools"
+                  className="text-xs font-semibold uppercase tracking-wider text-[#7385AD]"
+                >
+                  Ferramentas
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Simulação em Massa (100 Folhas) */}
+                  <div className="bg-[#070B19] p-5 rounded-2xl border border-[#1E2949] flex flex-col justify-between gap-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-[#7DD3FC] font-semibold text-sm">
+                        <Zap className="w-4 h-4" />
+                        Simulação (100 Folhas)
+                      </div>
+                      <p className="text-xs text-[#94A3C8]">
+                        Gera instantaneamente 100 contribuições com sonhos e cores para teste do telão.
+                      </p>
                     </div>
-                    <p className="text-xs text-[#94A3C8]">
-                      Gera backup automático da turma atual e limpa a tela para os próximos alunos.
-                    </p>
-                    <input
-                      type="text"
-                      value={resetTurmaLabel}
-                      onChange={(e) => setResetTurmaLabel(e.target.value)}
-                      placeholder="Nome da Turma"
-                      className="w-full bg-[#0E152B] border border-[#1E2949] rounded-lg px-3 py-1.5 text-xs text-[#F8F6F0] focus:outline-none focus:border-[#F5C451]"
-                    />
+                    <button
+                      type="button"
+                      onClick={handleSimulateLeaves}
+                      disabled={adminLoading}
+                      className="w-full bg-[#131C38] hover:bg-[#1B274D] disabled:opacity-60 border border-[#38BDF8]/40 text-[#7DD3FC] font-semibold py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5"
+                    >
+                      <Zap className="w-3.5 h-3.5" />
+                      Simular 100 Folhas
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleResetTree}
-                    disabled={adminLoading}
-                    className="w-full bg-[#F5C451] hover:bg-[#F7D06D] text-[#070B19] font-semibold py-2 rounded-lg text-xs transition-colors"
-                  >
-                    Resetar Árvore
-                  </button>
-                </div>
 
-                {/* Simulação em Massa (100 Folhas) */}
-                <div className="bg-[#070B19] p-5 rounded-2xl border border-[#1E2949] flex flex-col justify-between gap-3">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-[#7DD3FC] font-semibold text-sm">
-                      <Zap className="w-4 h-4" />
-                      Simulação (100 Folhas)
+                  {/* Exportar JSON */}
+                  <div className="bg-[#070B19] p-5 rounded-2xl border border-[#1E2949] flex flex-col justify-between gap-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-[#F8F6F0] font-semibold text-sm">
+                        <Download className="w-4 h-4 text-[#F5C451]" />
+                        Exportar Backup JSON
+                      </div>
+                      <p className="text-xs text-[#94A3C8]">
+                        Faz o download de todas as folhas ativas com nomes, sonhos e assinaturas.
+                      </p>
                     </div>
-                    <p className="text-xs text-[#94A3C8]">
-                      Gera instantaneamente 100 contribuições com sonhos e cores para teste do telão.
-                    </p>
+                    <button
+                      type="button"
+                      onClick={handleExportJson}
+                      disabled={adminLoading}
+                      className="w-full bg-[#131C38] hover:bg-[#1B274D] disabled:opacity-60 border border-[#2C3C6B] text-[#F8F6F0] font-semibold py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5"
+                    >
+                      <Download className="w-3.5 h-3.5 text-[#F5C451]" />
+                      Baixar Arquivo JSON
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleSimulateLeaves}
-                    disabled={adminLoading}
-                    className="w-full bg-[#131C38] hover:bg-[#1B274D] border border-[#38BDF8]/40 text-[#7DD3FC] font-semibold py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5"
-                  >
-                    <Zap className="w-3.5 h-3.5" />
-                    Simular 100 Folhas
-                  </button>
                 </div>
+              </section>
 
-                {/* Exportar JSON */}
-                <div className="bg-[#070B19] p-5 rounded-2xl border border-[#1E2949] flex flex-col justify-between gap-3">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-[#F8F6F0] font-semibold text-sm">
-                      <Download className="w-4 h-4 text-[#F5C451]" />
-                      Exportar Backup JSON
-                    </div>
-                    <p className="text-xs text-[#94A3C8]">
-                      Faz o download de todas as folhas ativas com nomes, sonhos e assinaturas.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleExportJson}
-                    className="w-full bg-[#131C38] hover:bg-[#1B274D] border border-[#2C3C6B] text-[#F8F6F0] font-semibold py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5"
+              {/* Ações da feira (pedem confirmação) */}
+              <section aria-labelledby="admin-fair-actions" className="space-y-3">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <h3
+                    id="admin-fair-actions"
+                    className="text-xs font-semibold uppercase tracking-wider text-[#7385AD]"
                   >
-                    <Download className="w-3.5 h-3.5 text-[#F5C451]" />
-                    Baixar Arquivo JSON
-                  </button>
+                    Ações da feira
+                  </h3>
+                  <span className="text-[11px] text-[#F59E0B] bg-[#D97706]/10 border border-[#D97706]/30 rounded-full px-2 py-0.5">
+                    pedem confirmação
+                  </span>
                 </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Reset para Nova Turma */}
+                  <div className="bg-[#070B19] p-5 rounded-2xl border border-[#D97706]/30 flex flex-col justify-between gap-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-[#F5C451] font-semibold text-sm">
+                        <RotateCcw className="w-4 h-4" />
+                        Nova Turma
+                      </div>
+                      <p className="text-xs text-[#94A3C8]">
+                        Gera backup automático da turma atual e limpa a tela para os próximos alunos.
+                      </p>
+                      <input
+                        type="text"
+                        value={resetTurmaLabel}
+                        onChange={(e) => setResetTurmaLabel(e.target.value)}
+                        placeholder="Nome da Turma"
+                        aria-label="Nome da turma"
+                        className="w-full bg-[#0E152B] border border-[#1E2949] rounded-lg px-3 py-1.5 text-xs text-[#F8F6F0] focus:outline-none focus:border-[#F5C451]"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleResetTree}
+                      disabled={adminLoading}
+                      className="w-full bg-rose-500/15 hover:bg-rose-500/25 disabled:opacity-60 border border-rose-400/40 text-rose-200 font-semibold py-2 rounded-lg text-xs transition-colors"
+                    >
+                      Resetar Árvore
+                    </button>
+                  </div>
 
-                {/* Restauração Final Coletiva */}
-                <div className="bg-[#070B19] p-5 rounded-2xl border border-[#1E2949] flex flex-col justify-between gap-3">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-[#F5C451] font-semibold text-sm">
-                      <Sparkles className="w-4 h-4" />
-                      Encerramento Feira
+                  {/* Restauração Final Coletiva */}
+                  <div className="bg-[#070B19] p-5 rounded-2xl border border-[#D97706]/30 flex flex-col justify-between gap-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-[#F5C451] font-semibold text-sm">
+                        <Sparkles className="w-4 h-4" />
+                        Encerramento Feira
+                      </div>
+                      <p className="text-xs text-[#94A3C8]">
+                        Restaura e consolida todas as folhas dos 2 dias de feira na árvore gigante.
+                      </p>
                     </div>
-                    <p className="text-xs text-[#94A3C8]">
-                      Restaura e consolida todas as folhas dos 2 dias de feira na árvore gigante.
-                    </p>
+                    <button
+                      type="button"
+                      onClick={handleRestoreAll}
+                      disabled={adminLoading}
+                      className="w-full bg-[#D97706] hover:bg-[#EA8C15] disabled:opacity-60 text-[#070B19] font-semibold py-2 rounded-lg text-xs transition-colors"
+                    >
+                      Restaurar Todas
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleRestoreAll}
-                    disabled={adminLoading}
-                    className="w-full bg-[#D97706] hover:bg-[#EA8C15] text-[#070B19] font-semibold py-2 rounded-lg text-xs transition-colors"
-                  >
-                    Restaurar Todas
-                  </button>
                 </div>
-              </div>
+              </section>
 
               {/* Tabela de Moderação das Folhas Ativas */}
               <div className="space-y-3">
@@ -1050,7 +1183,7 @@ export default function App() {
                           <td className="p-3 text-right">
                             <button
                               type="button"
-                              onClick={() => handleDeleteFolha(f.id)}
+                              onClick={() => handleDeleteFolha(f)}
                               disabled={adminLoading}
                               className="text-rose-300 hover:text-rose-200 bg-rose-500/10 hover:bg-rose-500/20 px-2.5 py-1 rounded-lg transition-colors"
                             >
@@ -1071,7 +1204,7 @@ export default function App() {
         {/* ========================================================================= */}
         {/* ABA 4: DOCUMENTAÇÃO & INTEGRAÇÃO DA API                                    */}
         {/* ========================================================================= */}
-        {activeTab === 'docs' && (
+        {activeTab === 'docs' && isAdmin && (
           <div className="max-w-4xl mx-auto w-full space-y-6 py-2">
             <div className="bg-[#0E152B] border border-[#1E2949] rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
               <div className="space-y-1 border-b border-[#1E2949] pb-4">
@@ -1180,10 +1313,30 @@ export default function App() {
         )}
       </main>
 
-      {/* Rodapé Informativo */}
-      <footer className="border-t border-[#1E2949]/80 bg-[#070B19] py-3.5 text-center text-xs text-[#6E80A8]">
-        NEUROTREE · Feira de Cursos da EEEP
+      {/* Rodapé Informativo (o cadeado discreto leva ao acesso dos organizadores) */}
+      <footer className="border-t border-[#1E2949]/80 bg-[#070B19] py-3.5 text-xs text-[#6E80A8]">
+        <div className="relative max-w-7xl mx-auto px-4 md:px-6 flex items-center justify-center">
+          <span>NEUROTREE · Feira de Cursos da EEEP</span>
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('admin');
+              window.scrollTo({ top: 0 });
+            }}
+            aria-label={isAdmin ? 'Abrir a gestão da feira' : 'Acesso dos organizadores'}
+            title={isAdmin ? 'Gestão da feira' : 'Acesso dos organizadores'}
+            className="absolute right-4 md:right-6 p-1.5 rounded-md text-[#2C3C6B] hover:text-[#94A3C8] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F5C451]"
+          >
+            <Lock className="w-3.5 h-3.5" aria-hidden="true" />
+          </button>
+        </div>
       </footer>
+
+      <ConfirmModal
+        request={confirmRequest}
+        loading={adminLoading}
+        onClose={() => setConfirmRequest(null)}
+      />
     </div>
   );
 }
