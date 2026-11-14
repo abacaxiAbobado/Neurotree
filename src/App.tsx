@@ -1254,7 +1254,7 @@ export default function App() {
                       DELETE
                     </span>
                     <span className="font-mono text-xs text-[#F8F6F0]">/api/admin/folha/:id</span>
-                    <span className="text-xs text-[#94A3C8]">— Requer Authorization: Bearer ADMIN_TOKEN</span>
+                    <span className="text-xs text-[#94A3C8]">— Requer sessão admin (cookie HttpOnly admin_token, obtido em /api/admin/login)</span>
                   </div>
                 </div>
               </div>
