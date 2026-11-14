@@ -29,6 +29,8 @@ export function getDbPool(): pg.Pool | null {
           max: 20,
           idleTimeoutMillis: 30000,
           connectionTimeoutMillis: 5000,
+          // Force IPv4 - Render free tier doesn't support IPv6 outbound
+          family: 4,
         }
       : {
           host: config.dbHost,
@@ -40,6 +42,8 @@ export function getDbPool(): pg.Pool | null {
           max: 20,
           idleTimeoutMillis: 30000,
           connectionTimeoutMillis: 5000,
+          // Force IPv4 - Render free tier doesn't support IPv6 outbound
+          family: 4,
         };
 
     pool = new Pool(poolConfig);
