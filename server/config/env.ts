@@ -13,6 +13,11 @@ const dbUser = process.env.DB_USER || process.env.PGUSER || 'postgres';
 const dbPassword = process.env.DB_PASSWORD || process.env.PGPASSWORD || '';
 const dbSslMode = process.env.DB_SSL || process.env.PGSSLMODE || '';
 
+// Admin authentication - bcrypt hash (generate with: node -e "console.log(require('bcrypt').hashSync('sua_senha', 12))")
+const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH || '';
+// JWT secret for admin session cookies (min 32 chars recommended)
+const jwtSecret = process.env.JWT_SECRET || 'neurotree_jwt_secret_change_in_production_32chars';
+
 export const config = {
   port: parseInt(
     process.env.APP_PORT ||
@@ -33,8 +38,10 @@ export const config = {
   dbPassword,
   dbSsl: dbSslMode === 'require' || dbSslMode === 'verify-full',
 
-  // Admin security token
-  adminToken: process.env.ADMIN_TOKEN || 'neurotree_admin_secret_2026',
+  // Admin authentication
+  adminPasswordHash,
+  jwtSecret,
+  adminSessionMaxAge: 4 * 60 * 60 * 1000, // 4 hours
 
   // Rate Limiting settings (adaptive for school Wi-Fi)
   rateLimitMaxPerMinute: parseInt(process.env.RATE_LIMIT_POINTS || '60', 10),

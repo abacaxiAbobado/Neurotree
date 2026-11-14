@@ -1,5 +1,6 @@
 import cors from 'cors';
 import express from 'express';
+import cookieParser from 'cookie-parser';
 import { createServer } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -28,6 +29,7 @@ async function startServer() {
       credentials: true,
     })
   );
+  app.use(cookieParser());
   app.use(express.json({ limit: '2mb' })); // Suporta Base64 da assinatura
   app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 

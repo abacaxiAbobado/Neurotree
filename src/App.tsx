@@ -19,6 +19,9 @@ import {
   ExternalLink,
   Code2,
   Zap,
+  Lock,
+  LogOut,
+  Unlock,
 } from 'lucide-react';
 
 export interface Folha {
@@ -70,9 +73,10 @@ export default function App() {
   const [isEditing, setIsEditing] = useState(false);
   const [editRemainingTime, setEditRemainingTime] = useState<string>('');
 
-  // Painel Admin
-  const [adminTokenInput, setAdminTokenInput] = useState('neurotree_admin_secret_2026');
+  // Painel Admin - Autenticação por senha + cookie JWT
+  const [adminPassword, setAdminPassword] = useState('');
   const [adminAuthed, setAdminAuthed] = useState(false);
+  const [adminChecking, setAdminChecking] = useState(true);
   const [adminMessage, setAdminMessage] = useState<string | null>(null);
   const [resetTurmaLabel, setResetTurmaLabel] = useState('Turma 3º Ano Informática');
   const [adminLoading, setAdminLoading] = useState(false);
@@ -161,6 +165,9 @@ export default function App() {
     // Busca status da API
     fetchHealth();
 
+    // Verifica sessão admin existente (cookie JWT)
+    checkAdminSession();
+
     return () => {
       socket.disconnect();
     };
@@ -201,6 +208,23 @@ export default function App() {
       }
     } catch {
       // Ignora falhas em rede
+    }
+  };
+
+  // Verifica se há sessão admin válida (cookie JWT HttpOnly)
+  const checkAdminSession = async () => {
+    try {
+      const res = await fetch('/api/admin/me', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setAdminAuthed(true);
+        }
+      }
+    } catch {
+      // Sem sessão válida
+    } finally {
+      setAdminChecking(false);
     }
   };
 
@@ -374,14 +398,53 @@ export default function App() {
     }
   };
 
-  // Ações Administrativas
+  // Admin: Login com senha
+  const handleAdminLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdminMessage(null);
+    setAdminLoading(true);
+    try {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ password: adminPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      setAdminAuthed(true);
+      setAdminMessage('✅ Login realizado com sucesso!');
+      setAdminPassword(''); // Limpa senha do estado
+    } catch (err: any) {
+      setAdminMessage(`❌ ${err.message}`);
+    } finally {
+      setAdminLoading(false);
+    }
+  };
+
+  // Admin: Logout
+  const handleAdminLogout = async () => {
+    setAdminLoading(true);
+    try {
+      await fetch('/api/admin/logout', { method: 'POST', credentials: 'include' });
+      setAdminAuthed(false);
+      setAdminMessage('✅ Logout realizado.');
+    } catch {
+      setAdminAuthed(false);
+      setAdminMessage('✅ Sessão encerrada.');
+    } finally {
+      setAdminLoading(false);
+    }
+  };
+
+  // Ações Administrativas (usam cookie JWT automaticamente via credentials: 'include')
   const handleDeleteFolha = async (id: string) => {
     if (!window.confirm('Tem certeza que deseja excluir esta folha?')) return;
     setAdminLoading(true);
     try {
       const res = await fetch(`/api/admin/folha/${id}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${adminTokenInput}` },
+        credentials: 'include',
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
@@ -405,10 +468,8 @@ export default function App() {
     try {
       const res = await fetch('/api/admin/reset', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${adminTokenInput}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ label: resetTurmaLabel }),
       });
       const data = await res.json();
@@ -435,7 +496,7 @@ export default function App() {
     try {
       const res = await fetch('/api/admin/restore', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${adminTokenInput}` },
+        credentials: 'include',
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
@@ -456,7 +517,7 @@ export default function App() {
   };
 
   const handleExportJson = () => {
-    window.location.href = `/api/admin/export?token=${encodeURIComponent(adminTokenInput)}`;
+    window.open('/api/admin/export', '_blank');
   };
 
   const handleSimulateLeaves = async () => {
@@ -464,10 +525,8 @@ export default function App() {
     try {
       const res = await fetch('/api/admin/simulate', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${adminTokenInput}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ count: 100 }),
       });
       const data = await res.json();
@@ -901,18 +960,17 @@ export default function App() {
                     Controle oficial para os organizadores da Feira de Cursos (EEEP).
                   </p>
                 </div>
-                <div className="flex items-center gap-2.5">
-                  <input
-                    type="password"
-                    value={adminTokenInput}
-                    onChange={(e) => setAdminTokenInput(e.target.value)}
-                    placeholder="ADMIN_TOKEN"
-                    className="bg-[#070B19] border border-[#1E2949] rounded-lg px-3 py-1.5 text-xs text-[#F8F6F0] focus:outline-none focus:border-[#F5C451]"
-                  />
-                  <span className="text-xs font-medium text-[#F5C451]">
-                    Token ativo
-                  </span>
-                </div>
+                {adminAuthed && (
+                  <button
+                    type="button"
+                    onClick={handleAdminLogout}
+                    disabled={adminLoading}
+                    className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    Sair
+                  </button>
+                )}
               </div>
 
               {adminMessage && (
@@ -921,8 +979,62 @@ export default function App() {
                 </div>
               )}
 
-              {/* Ações Rápidas da Feira */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Tela de Login Admin */}
+              {!adminAuthed && !adminChecking && (
+                <div className="max-w-md mx-auto space-y-4">
+                  <div className="text-center space-y-2">
+                    <Lock className="w-10 h-10 text-[#F5C451] mx-auto" />
+                    <h3 className="font-display text-lg font-bold text-[#F8F6F0]">
+                      Acesso Restrito
+                    </h3>
+                    <p className="text-xs text-[#94A3C8]">
+                      Digite a senha de administrador para acessar o painel de gestão.
+                    </p>
+                  </div>
+                  <form onSubmit={handleAdminLogin} className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-[#CBD5E1]">
+                        Senha de Administrador
+                      </label>
+                      <input
+                        type="password"
+                        value={adminPassword}
+                        onChange={(e) => setAdminPassword(e.target.value)}
+                        placeholder="Digite a senha"
+                        autoComplete="current-password"
+                        required
+                        className="w-full bg-[#070B19] border border-[#1E2949] rounded-xl px-4 py-2.5 text-sm text-[#F8F6F0] placeholder-[#566894] focus:outline-none focus:border-[#F5C451] transition-colors"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={adminLoading}
+                      className="w-full bg-gradient-to-r from-[#F5C451] to-[#D97706] hover:from-[#F7D06D] hover:to-[#E58A1A] text-[#070B19] font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2 shadow-[0_8px_24px_rgba(245,196,81,0.22)] disabled:opacity-50"
+                    >
+                      {adminLoading ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Unlock className="w-4 h-4" />
+                      )}
+                      {adminLoading ? 'Entrando...' : 'Acessar Painel'}
+                    </button>
+                  </form>
+                </div>
+              )}
+
+              {/* Carregando verificação de sessão */}
+              {adminChecking && (
+                <div className="flex items-center justify-center py-12">
+                  <RefreshCw className="w-6 h-6 text-[#F5C451] animate-spin" />
+                  <span className="ml-2 text-xs text-[#94A3C8]">Verificando sessão...</span>
+                </div>
+              )}
+
+              {/* Painel Admin Autenticado */}
+              {adminAuthed && (
+                <div>
+                  {/* Ações Rápidas da Feira */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Reset para Nova Turma */}
                 <div className="bg-[#070B19] p-5 rounded-2xl border border-[#1E2949] flex flex-col justify-between gap-3">
                   <div className="space-y-2">
