@@ -22,29 +22,21 @@ export function getDbPool(): pg.Pool | null {
   }
 
   try {
-    const poolConfig: pg.PoolConfig = config.databaseUrl
-      ? {
-          connectionString: config.databaseUrl,
-          ssl: config.dbSsl ? { rejectUnauthorized: false } : false,
-          max: 20,
-          idleTimeoutMillis: 30000,
-          connectionTimeoutMillis: 5000,
-          // Force IPv4 - Render free tier doesn't support IPv6 outbound
-          family: 4,
-        }
-      : {
-          host: config.dbHost,
-          port: config.dbPort,
-          database: config.dbName,
-          user: config.dbUser,
-          password: config.dbPassword,
-          ssl: config.dbSsl ? { rejectUnauthorized: false } : false,
-          max: 20,
-          idleTimeoutMillis: 30000,
-          connectionTimeoutMillis: 5000,
-          // Force IPv4 - Render free tier doesn't support IPv6 outbound
-          family: 4,
-        };
+    // Use individual params (not connectionString) so `family: 4` is respected
+    // connectionString parsing ignores the `family` option in pg
+    const poolConfig: pg.PoolConfig = {
+      host: config.dbHost,
+      port: config.dbPort,
+      database: config.dbName,
+      user: config.dbUser,
+      password: config.dbPassword,
+      ssl: config.dbSsl ? { rejectUnauthorized: false } : false,
+      max: 20,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000,
+      // Force IPv4 - Render free tier doesn't support IPv6 outbound
+      family: 4,
+    };
 
     pool = new Pool(poolConfig);
 
