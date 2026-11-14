@@ -28,7 +28,9 @@ services:
       - key: DB_SSL
         fromDatabase:
         property: PGSSLMODE
-      - key: ADMIN_TOKEN
+      - key: ADMIN_PASSWORD_HASH
+        sync: false
+      - key: JWT_SECRET
         generateValue: true
       - key: RATE_LIMIT_POINTS
         value: "60"
