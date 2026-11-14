@@ -1,5 +1,9 @@
 import pg from 'pg';
 import { config } from './env.ts';
+import { setDefaultResultOrder } from 'dns';
+
+// Force IPv4 DNS resolution - Render free tier doesn't support IPv6 outbound
+setDefaultResultOrder('ipv4first');
 
 const { Pool } = pg;
 
