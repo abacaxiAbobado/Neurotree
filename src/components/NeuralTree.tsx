@@ -2231,36 +2231,57 @@ export function NeuralTree({
 
           if (p <= 0.42) {
             const waveP = Math.min(1, p / 0.38);
-            let wavePt: { x: number; y: number };
-            if (isMasterHost) {
-              if (waveP < 0.44) {
-                const tt = waveP / 0.44;
-                wavePt = {
+
+            // Posição da esfera-guia ao longo do caminho tronco -> braço -> ponto de nascimento
+            const waveAt = (wp: number): { x: number; y: number } => {
+              if (isMasterHost) {
+                if (wp < 0.44) {
+                  const tt = wp / 0.44;
+                  return {
+                    x: trunkCenterX + Math.sin(tt * Math.PI * 2) * 3,
+                    y: rootMergeY - (rootMergeY - crotchY) * tt,
+                  };
+                }
+                const tt = ((wp - 0.44) / 0.56) * lp.anchorT;
+                return evalMasterPointFromCache(lp.branchIdx, tt);
+              }
+              if (wp < 0.38) {
+                const tt = wp / 0.38;
+                return {
                   x: trunkCenterX + Math.sin(tt * Math.PI * 2) * 3,
                   y: rootMergeY - (rootMergeY - crotchY) * tt,
                 };
-              } else {
-                const tt = ((waveP - 0.44) / 0.56) * lp.anchorT;
-                wavePt = evalMasterPointFromCache(lp.branchIdx, tt);
               }
-            } else {
-              if (waveP < 0.38) {
-                const tt = waveP / 0.38;
-                wavePt = {
-                  x: trunkCenterX + Math.sin(tt * Math.PI * 2) * 3,
-                  y: rootMergeY - (rootMergeY - crotchY) * tt,
-                };
-              } else if (waveP < 0.68) {
-                const tt = ((waveP - 0.38) / 0.30) * bc!.tb.attachT;
-                wavePt = evalMasterPointFromCache(bc!.tb.masterIdx, tt);
-              } else {
-                const tt = ((waveP - 0.68) / 0.32) * lp.anchorT;
-                wavePt = evalCubic(bc!.p0, bc!.p1, bc!.p2, bc!.p3, tt);
+              if (wp < 0.68) {
+                const tt = ((wp - 0.38) / 0.30) * bc!.tb.attachT;
+                return evalMasterPointFromCache(bc!.tb.masterIdx, tt);
               }
-            }
+              const tt = ((wp - 0.68) / 0.32) * lp.anchorT;
+              return evalCubic(bc!.p0, bc!.p1, bc!.p2, bc!.p3, tt);
+            };
+
+            const wavePt = waveAt(waveP);
 
             ctx.globalCompositeOperation = 'lighter';
-            stampGlow(lp.folha.cor, wavePt.x, wavePt.y, 16, 0.85);
+
+            // Rastro luminoso que se apaga atrás da esfera
+            for (let k = 5; k >= 1; k--) {
+              const tp = waveAt(Math.max(0, waveP - k * 0.022));
+              stampGlow(lp.folha.cor, tp.x, tp.y, 14 - k * 1.6, 0.5 - k * 0.07);
+            }
+
+            // Halo amplo + esfera principal + núcleo branco pulsante
+            const pulse = 0.85 + 0.15 * Math.sin(time * 18);
+            stampGlow(lp.folha.cor, wavePt.x, wavePt.y, 38 * pulse, 0.4);
+            stampGlow(lp.folha.cor, wavePt.x, wavePt.y, 20, 0.95);
+            stampGlow('#FFFFFF', wavePt.x, wavePt.y, 8, 1);
+
+            // Clarão na chegada ao ponto de nascimento do galho
+            if (waveP > 0.9) {
+              const flashT = (waveP - 0.9) / 0.1;
+              stampGlow('#FFFFFF', wavePt.x, wavePt.y, 14 + flashT * 26, 0.7 * (1 - flashT * 0.4));
+            }
+
             ctx.globalCompositeOperation = 'source-over';
           }
 
