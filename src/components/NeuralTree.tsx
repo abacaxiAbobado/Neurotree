@@ -727,7 +727,7 @@ export function NeuralTree({
     }));
 
     // Pulsos de energia temporal ("Nexus Surges")
-    const temporalPulses = Array.from({ length: 24 }, () => ({
+    const temporalPulses = Array.from({ length: 8 }, () => ({
       boughIdx: Math.floor(Math.random() * timelineBoughs.length),
       progress: Math.random(),
       speed: 0.0035 + Math.random() * 0.005,
@@ -736,7 +736,7 @@ export function NeuralTree({
     }));
 
     // Pulsos de energia viajando pelos fios trançados do tronco
-    const trunkWirePulses = Array.from({ length: 16 }, () => ({
+    const trunkWirePulses = Array.from({ length: 6 }, () => ({
       strandIdx: Math.floor(Math.random() * 20),
       progress: Math.random(),
       speed: 0.004 + Math.random() * 0.006,
