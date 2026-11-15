@@ -586,6 +586,22 @@ export default function App() {
     window.open('/api/admin/export', '_blank');
   };
 
+  // Computador: somente o telão da árvore, sempre aberto e em tela cheia (sem menus, abas ou rodapé)
+  if (!isMobile) {
+    return (
+      <div className="fixed inset-0 bg-[#070B19] text-[#F8F6F0] overflow-hidden">
+        <NeuralTree
+          fillScreen
+          folhas={folhas}
+          selectedFolha={selectedFolha}
+          onSelectFolha={setSelectedFolha}
+          onClearSelection={() => setSelectedFolha(null)}
+          newLeafBirths={newLeafBirths}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#070B19] text-[#F8F6F0] flex flex-col selection:bg-[#F5C451] selection:text-[#070B19]">
       {/* Barra de Navegação Superior — Contrato Limpo em 3 Zonas + Abas com Linha Indicadora Ativa */}

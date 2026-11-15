@@ -21,6 +21,8 @@ interface NeuralTreeProps {
   onSelectFolha: (folha: Folha) => void;
   onClearSelection: () => void;
   newLeafBirths?: Record<string, number>;
+  /** Ocupa a janela inteira o tempo todo (modo telão, sem borda nem margens) */
+  fillScreen?: boolean;
 }
 
 interface LeafPlacement {
@@ -457,6 +459,7 @@ export function NeuralTree({
   onSelectFolha,
   onClearSelection,
   newLeafBirths = {},
+  fillScreen = false,
 }: NeuralTreeProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -2599,7 +2602,7 @@ export function NeuralTree({
     <div
       ref={containerRef}
       className={`relative overflow-hidden select-none bg-[#070B19] flex flex-col justify-between transition-all ${
-        isFullscreen
+        isFullscreen || fillScreen
           ? 'fixed inset-0 z-50 h-screen w-screen'
           : 'w-full rounded-3xl border border-[#1E2949] shadow-2xl min-h-[660px] h-[78vh]'
       }`}
