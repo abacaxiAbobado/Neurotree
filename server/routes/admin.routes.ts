@@ -93,7 +93,4 @@ router.get('/backups', adminController.listBackups.bind(adminController));
 // POST /api/admin/restore - Restaurar todas as folhas para a árvore coletiva final
 router.post('/restore', adminController.restoreAll.bind(adminController));
 
-// POST /api/admin/simulate - Simular 100 folhas de uma vez
-router.post('/simulate', adminController.simulateLeaves.bind(adminController));
-
 export default router;

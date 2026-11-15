@@ -18,7 +18,6 @@ import {
   RefreshCw,
   ExternalLink,
   Code2,
-  Zap,
   Lock,
   LogOut,
   Unlock,
@@ -580,45 +579,6 @@ export default function App() {
     window.open('/api/admin/export', '_blank');
   };
 
-  const handleSimulateLeaves = async () => {
-    setAdminLoading(true);
-    try {
-      const res = await fetch('/api/admin/simulate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ count: 100 }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
-      setAdminMessage(
-        `🚀 Simulação concluída com sucesso! ${data.totalCriadas} folhas adicionadas à árvore (Total ativo: ${data.totalAtivas}).`
-      );
-      // Atualiza folhas no telão
-      const leavesRes = await fetch('/api/folha?limit=200');
-      const leavesData = await leavesRes.json();
-      if (leavesData.success) {
-        const existingIds = new Set(folhas.map((f) => f.id));
-        const now = Date.now();
-        const addedBirths: Record<string, number> = {};
-        leavesData.data.forEach((f: Folha) => {
-          if (!existingIds.has(f.id)) {
-            addedBirths[f.id] = now;
-          }
-        });
-        if (Object.keys(addedBirths).length > 0) {
-          setNewLeafBirths((prev) => ({ ...prev, ...addedBirths }));
-        }
-        setFolhas(leavesData.data);
-        setTotalCount(leavesData.data.length);
-      }
-    } catch (err: any) {
-      setAdminMessage(`❌ Erro na simulação: ${err.message}`);
-    } finally {
-      setAdminLoading(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-[#070B19] text-[#F8F6F0] flex flex-col selection:bg-[#F5C451] selection:text-[#070B19]">
       {/* Barra de Navegação Superior — Contrato Limpo em 3 Zonas + Abas com Linha Indicadora Ativa */}
@@ -1112,7 +1072,7 @@ export default function App() {
             )}
 
             {/* Ações Rápidas da Feira */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
               {/* Reset para Nova Turma */}
               <div className="bg-[#070B19] p-5 rounded-2xl border border-[#1E2949] flex flex-col justify-between gap-3">
                 <div className="space-y-2">
@@ -1136,26 +1096,6 @@ export default function App() {
                   className="w-full bg-[#F5C451] hover:bg-[#F7D06D] text-[#070B19] font-semibold py-2 rounded-lg text-xs transition-colors"
                 >
                   Resetar Árvore
-                </button>
-              </div>
-
-              {/* Simulação em Massa (100 Folhas) */}
-              <div className="bg-[#070B19] p-5 rounded-2xl border border-[#1E2949] flex flex-col justify-between gap-3">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-[#7DD3FC] font-semibold text-sm">
-                    <Zap className="w-4 h-4" />
-                    Simulação (100 Folhas)
-                  </div>
-                  <p className="text-xs text-[#94A3C8]">Gera instantaneamente 100 contribuições com sonhos e cores para teste do telão.</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleSimulateLeaves}
-                  disabled={adminLoading}
-                  className="w-full bg-[#131C38] hover:bg-[#1B274D] border border-[#38BDF8]/40 text-[#7DD3FC] font-semibold py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5"
-                >
-                  <Zap className="w-3.5 h-3.5" />
-                  Simular 100 Folhas
                 </button>
               </div>
 

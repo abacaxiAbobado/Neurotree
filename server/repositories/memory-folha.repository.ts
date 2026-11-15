@@ -5,60 +5,6 @@ import { Folha, IFolhaRepository } from './folha.repository.ts';
 export class MemoryFolhaRepository implements IFolhaRepository {
   private folhas: Map<string, Folha> = new Map();
 
-  constructor() {
-    this.seedDemoLeaves();
-  }
-
-  private seedDemoLeaves() {
-    // 3 folhas de demonstração para exibição inicial no preview
-    const now = new Date();
-    const demo1: Folha = {
-      id: crypto.randomUUID(),
-      nome: 'Prof. Carlos Eduardo',
-      cor: '#F5C451',
-      profissao: 'Engenheiro de Computação',
-      assinatura:
-        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAGggJ/PchI7wAAAABJRU5ErkJggg==',
-      mensagem: 'Bem-vindos à Feira de Cursos da EEEP! O futuro começa agora.',
-      edit_token: crypto.randomUUID(),
-      edit_expires_at: new Date(now.getTime() + 15 * 60 * 1000).toISOString(),
-      created_at: new Date(now.getTime() - 10 * 60 * 1000).toISOString(),
-      updated_at: new Date(now.getTime() - 10 * 60 * 1000).toISOString(),
-    };
-
-    const demo2: Folha = {
-      id: crypto.randomUUID(),
-      nome: 'Mariana Silva (3º Ano)',
-      cor: '#38BDF8',
-      profissao: 'Desenvolvedora Full-Stack',
-      assinatura:
-        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAGggJ/PchI7wAAAABJRU5ErkJggg==',
-      mensagem: 'Construindo o NEUROTREE com tecnologia e dedicação!',
-      edit_token: crypto.randomUUID(),
-      edit_expires_at: new Date(now.getTime() + 15 * 60 * 1000).toISOString(),
-      created_at: new Date(now.getTime() - 5 * 60 * 1000).toISOString(),
-      updated_at: new Date(now.getTime() - 5 * 60 * 1000).toISOString(),
-    };
-
-    const demo3: Folha = {
-      id: crypto.randomUUID(),
-      nome: 'Gabriel Mendes',
-      cor: '#A855F7',
-      profissao: 'Designer de Interação & Games',
-      assinatura:
-        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAGggJ/PchI7wAAAABJRU5ErkJggg==',
-      mensagem: 'A arte e o código transformando ideias em realidade.',
-      edit_token: crypto.randomUUID(),
-      edit_expires_at: new Date(now.getTime() + 15 * 60 * 1000).toISOString(),
-      created_at: now.toISOString(),
-      updated_at: now.toISOString(),
-    };
-
-    this.folhas.set(demo1.id, demo1);
-    this.folhas.set(demo2.id, demo2);
-    this.folhas.set(demo3.id, demo3);
-  }
-
   async create(data: CreateFolhaInput): Promise<Folha> {
     const now = new Date();
     const editExpiresAt = new Date(now.getTime() + 15 * 60 * 1000);
