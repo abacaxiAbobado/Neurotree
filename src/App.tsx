@@ -51,8 +51,22 @@ const PRESET_COLORS = [
   { name: 'Turquesa Astral', hex: '#2DD4BF', darkCheck: true },
 ];
 
+const MOBILE_QUERY = '(max-width: 767px)';
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'telao' | 'formulario'>('telao');
+  // Celular: mostra apenas o formulário de inserir folha (cadeado de admin fica no rodapé)
+  const [isMobile, setIsMobile] = useState<boolean>(() =>
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia(MOBILE_QUERY).matches
+      : false
+  );
+  const [activeTab, setActiveTab] = useState<'telao' | 'formulario'>(() =>
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia(MOBILE_QUERY).matches
+      ? 'formulario'
+      : 'telao'
+  );
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [showAdminPassword, setShowAdminPassword] = useState(false);
   const [folhas, setFolhas] = useState<Folha[]>([]);
@@ -93,6 +107,27 @@ export default function App() {
 
   // Socket.IO Ref
   const socketRef = useRef<Socket | null>(null);
+
+  // Mensagem de "folha enviada" (alvo do scroll automático após o envio)
+  const successRef = useRef<HTMLDivElement | null>(null);
+
+  // Acompanha mudança de largura (rotação / redimensionamento) e força o formulário no celular
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return;
+    const mql = window.matchMedia(MOBILE_QUERY);
+    const onChange = (ev: MediaQueryListEvent) => {
+      setIsMobile(ev.matches);
+      if (ev.matches) setActiveTab('formulario');
+    };
+    mql.addEventListener('change', onChange);
+    return () => mql.removeEventListener('change', onChange);
+  }, []);
+
+  // Ao enviar a folha, rola a tela até a mensagem de confirmação
+  useEffect(() => {
+    if (!submitSuccess || isEditing) return;
+    successRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [submitSuccess, isEditing]);
 
   // 1. Inicializa Socket.IO e busca folhas iniciais
   useEffect(() => {
@@ -572,7 +607,7 @@ export default function App() {
           {/* Zona 1: Marca em linha única */}
           <button
             type="button"
-            onClick={() => setActiveTab('telao')}
+            onClick={() => !isMobile && setActiveTab('telao')}
             className="flex items-center gap-2.5 text-left whitespace-nowrap shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F5C451] rounded-lg"
           >
             <TreeDeciduous className="w-5 h-5 text-[#F5C451] shrink-0" />
@@ -582,6 +617,7 @@ export default function App() {
           </button>
 
           {/* Zona 2: Abas limpas com linha indicadora dourada ativa */}
+          {!isMobile && (
           <nav
             aria-label="Navegação principal"
             className="flex items-stretch h-16 gap-5 md:gap-7 overflow-x-auto no-scrollbar"
@@ -620,9 +656,10 @@ export default function App() {
               <span>Contribuir</span>
             </button>
           </nav>
+          )}
 
           {/* Zona 3: Ação Principal */}
-          <div className="hidden sm:flex items-center shrink-0">
+          <div className="hidden md:flex items-center shrink-0">
             <button
               type="button"
               onClick={() => setActiveTab('formulario')}
@@ -722,7 +759,10 @@ export default function App() {
 
               {/* Feedback de sucesso após o envio */}
               {submitSuccess && !isEditing && (
-                <div className="bg-[#F5C451]/10 border border-[#F5C451]/35 rounded-2xl p-5 space-y-3">
+                <div
+                  ref={successRef}
+                  className="scroll-mt-20 bg-[#F5C451]/10 border border-[#F5C451]/35 rounded-2xl p-5 space-y-3"
+                >
                   <div className="flex items-center gap-2 text-[#F5C451] font-semibold text-sm">
                     <CheckCircle2 className="w-5 h-5" />
                     Sua folha foi plantada na árvore com sucesso!
