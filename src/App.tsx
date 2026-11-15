@@ -68,6 +68,8 @@ export default function App() {
       : 'telao'
   );
   const [showAdminModal, setShowAdminModal] = useState(false);
+  const [adminModalClosing, setAdminModalClosing] = useState(false);
+  const adminCloseTimerRef = useRef<number | null>(null);
   const [showAdminPassword, setShowAdminPassword] = useState(false);
   const [folhas, setFolhas] = useState<Folha[]>([]);
   const [selectedFolha, setSelectedFolha] = useState<Folha | null>(null);
@@ -107,6 +109,24 @@ export default function App() {
 
   // Socket.IO Ref
   const socketRef = useRef<Socket | null>(null);
+
+  // Fecha o modal de admin tocando a animação de saída antes de desmontar
+  const closeAdminModal = () => {
+    if (adminModalClosing) return;
+    setAdminModalClosing(true);
+    adminCloseTimerRef.current = window.setTimeout(() => {
+      setShowAdminModal(false);
+      setAdminModalClosing(false);
+      adminCloseTimerRef.current = null;
+    }, 220);
+  };
+
+  useEffect(
+    () => () => {
+      if (adminCloseTimerRef.current) window.clearTimeout(adminCloseTimerRef.current);
+    },
+    []
+  );
 
   // Mensagem de "folha enviada" (alvo do scroll automático após o envio)
   const successRef = useRef<HTMLDivElement | null>(null);
@@ -973,19 +993,25 @@ export default function App() {
       </footer>
 
       {/* Modal de Login Admin (Discreto - Cadeado no Rodapé) */}
-      {showAdminModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#070B19]/95 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-[#0E152B] border border-[#1E2949] rounded-3xl p-6 md:p-8 shadow-2xl space-y-6 animate-fade-in">
+      {!adminAuthed && showAdminModal && (
+        <div
+          data-closing={adminModalClosing}
+          className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#070B19]/95 backdrop-blur-sm"
+        >
+          <div
+            data-closing={adminModalClosing}
+            className="modal-card relative w-full max-w-md bg-[#0E152B] border border-[#1E2949] rounded-3xl p-6 md:p-8 shadow-2xl space-y-6"
+          >
             <button
               type="button"
-              onClick={() => setShowAdminModal(false)}
+              onClick={closeAdminModal}
               className="absolute top-4 right-4 p-1 rounded-lg text-[#566894] hover:text-[#F8F6F0] hover:bg-[#131C38] transition-colors"
               aria-label="Fechar"
             >
               <X className="w-5 h-5" />
             </button>
             <div className="text-center space-y-2">
-              <Lock className="w-10 h-10 text-[#F5C451] mx-auto" />
+              <Lock className="modal-lock w-10 h-10 text-[#F5C451] mx-auto" />
               <h3 className="font-display text-lg font-bold text-[#F8F6F0]">Acesso Restrito</h3>
               <p className="text-xs text-[#94A3C8]">Digite a senha de administrador para acessar o painel de gestão.</p>
             </div>
@@ -1042,8 +1068,14 @@ export default function App() {
       )}
 
       {adminAuthed && showAdminModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#070B19]/95 backdrop-blur-sm">
-          <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-[#0E152B] border border-[#1E2949] rounded-3xl p-6 md:p-8 shadow-2xl animate-fade-in">
+        <div
+          data-closing={adminModalClosing}
+          className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#070B19]/95 backdrop-blur-sm"
+        >
+          <div
+            data-closing={adminModalClosing}
+            className="modal-card w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-[#0E152B] border border-[#1E2949] rounded-3xl p-6 md:p-8 shadow-2xl"
+          >
             <div className="flex items-center justify-between border-b border-[#1E2949] pb-4 gap-4 flex-wrap mb-6">
               <div className="space-y-1">
                 <h2 className="font-display text-xl font-bold text-[#F8F6F0] flex items-center gap-2.5">
@@ -1055,7 +1087,7 @@ export default function App() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowAdminModal(false)}
+                  onClick={closeAdminModal}
                   className="p-1.5 rounded-lg text-[#566894] hover:text-[#F8F6F0] hover:bg-[#131C38] transition-colors"
                   aria-label="Fechar painel"
                 >
