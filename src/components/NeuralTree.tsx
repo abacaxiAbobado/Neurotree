@@ -368,6 +368,89 @@ const LeafCanopyItem = memo(function LeafCanopyItem({
   );
 });
 
+// Folha que acabou de ser deletada: murcha, cai girando e se desfaz em centelhas
+const DYING_MS = 1300;
+
+const DyingLeafGhost = memo(function DyingLeafGhost({
+  lp,
+  leafW,
+  leafH,
+}: {
+  lp: LeafPlacement;
+  leafW: number;
+  leafH: number;
+}) {
+  const h = hashId(lp.id);
+  const dir = h % 2 === 0 ? 1 : -1;
+  const driftX = dir * (18 + (h % 22));
+  const driftRot = dir * (50 + (h % 40));
+  const sparks = Array.from({ length: 9 }, (_, i) => {
+    const ang = (i / 9) * Math.PI * 2 + ((h >>> 3) % 10) * 0.1;
+    const dist = 26 + ((h >>> (i % 8)) % 22);
+    return { dx: Math.cos(ang) * dist, dy: Math.sin(ang) * dist, delay: (i % 3) * 0.04 };
+  });
+
+  return (
+    <div
+      className="absolute pointer-events-none"
+      style={{
+        left: `${lp.x}%`,
+        top: `${lp.y}%`,
+        transform: 'translate(-50%, -92%)',
+        zIndex: 25,
+      }}
+      aria-hidden="true"
+    >
+      <div style={{ transform: `rotate(${lp.angle}deg)`, transformOrigin: '50% 92%' }}>
+        <div
+          className="leaf-wither"
+          style={
+            {
+              transformOrigin: '50% 92%',
+              '--drift-x': `${driftX}px`,
+              '--drift-rot': `${driftRot}deg`,
+            } as React.CSSProperties
+          }
+        >
+          <BotanicalLeaf
+            id={lp.folha.id}
+            color={lp.folha.cor}
+            width={leafW}
+            height={leafH}
+            isSelected={false}
+            isHovered={false}
+            uidSuffix="dying"
+          />
+        </div>
+      </div>
+
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span
+          className="leaf-death-ring absolute rounded-full border-2"
+          style={{ borderColor: lp.folha.cor, width: 22, height: 22 }}
+        />
+        {sparks.map((sp, i) => (
+          <span
+            key={i}
+            className="leaf-death-spark absolute rounded-full"
+            style={
+              {
+                width: 4,
+                height: 4,
+                backgroundColor: lp.folha.cor,
+                boxShadow: `0 0 8px 2px ${lp.folha.cor}`,
+                '--dx': `${sp.dx}px`,
+                '--dy': `${sp.dy}px`,
+                animationDelay: `${sp.delay}s`,
+              } as React.CSSProperties
+            }
+          />
+        ))}
+      </div>
+    </div>
+  );
+});
+
 export function NeuralTree({
   folhas,
   selectedFolha,
@@ -385,6 +468,9 @@ export function NeuralTree({
   const [leafSizeMultiplier, setLeafSizeMultiplier] = useState<number>(1);
   const [audioEnabled, setAudioEnabled] = useState<boolean>(false);
   const [bloomDelays, setBloomDelays] = useState<Record<string, number>>({});
+  const [dyingLeaves, setDyingLeaves] = useState<LeafPlacement[]>([]);
+  const prevPlacementsRef = useRef<LeafPlacement[]>([]);
+  const dyingTimersRef = useRef<number[]>([]);
 
   // Refs estáveis para evitar reiniciar o loop do canvas ao selecionar/passar o mouse/criar folhas
   const selectedFolhaRef = useRef<Folha | null>(selectedFolha);
@@ -603,6 +689,33 @@ export function NeuralTree({
     geomDirtyRef.current = true;
     staticDirtyRef.current = true;
   }, [leafPlacements]);
+
+  // Detecta folhas removidas (exclusão pelo admin) e toca a animação de morte.
+  // Remoções em massa (reset da árvore) não animam, para não pesar a tela.
+  useEffect(() => {
+    const prev = prevPlacementsRef.current;
+    prevPlacementsRef.current = leafPlacements;
+    if (prev.length === 0) return;
+
+    const currentIds = new Set(leafPlacements.map((l) => l.id));
+    const removed = prev.filter((l) => !currentIds.has(l.id));
+    if (removed.length === 0 || removed.length > 5) return;
+
+    setDyingLeaves((d) => [...d, ...removed]);
+    playCosmicChime(262);
+    const ids = new Set(removed.map((r) => r.id));
+    const timer = window.setTimeout(() => {
+      setDyingLeaves((d) => d.filter((x) => !ids.has(x.id)));
+    }, DYING_MS + 100);
+    dyingTimersRef.current.push(timer);
+  }, [leafPlacements, playCosmicChime]);
+
+  useEffect(
+    () => () => {
+      dyingTimersRef.current.forEach((t) => window.clearTimeout(t));
+    },
+    []
+  );
 
   // Registra folhas recém-criadas para cor padrão do tronco + animação especial em 3 etapas
   useEffect(() => {
@@ -2511,6 +2624,15 @@ export function NeuralTree({
             />
           );
         })}
+
+        {dyingLeaves.map((lp) => (
+          <DyingLeafGhost
+            key={`dying-${lp.id}`}
+            lp={lp}
+            leafW={28 * lp.scale * leafSizeMultiplier}
+            leafH={39 * lp.scale * leafSizeMultiplier}
+          />
+        ))}
       </div>
 
       {/* 3. Barra Superior HUD do Telão Cósmico de Yggdrasil */}
