@@ -5,48 +5,9 @@ import { Folha } from '../repositories/folha.repository.ts';
 
 const BACKUP_DIR = path.resolve(process.cwd(), 'backups');
 
-type BackupInfo = {
-  filename: string;
-  createdAt: string;
-  totalFolhas: number;
-  label: string;
-};
-
-/**
- * Backups de sessão.
- *
- * - Com PostgreSQL conectado: os backups ficam na tabela `folha_backup` (sobrevivem a
- *   reinícios e novos deploys do servidor).
- * - Sem banco (fallback em memória, desenvolvimento/testes): usa arquivos .json na pasta
- *   `backups/`, como antes.
- */
 export class BackupService {
-  private tableReady = false;
-
   constructor() {
-    // A pasta de arquivos só é criada sob demanda (modo sem banco).
-  }
-
-  private usePg(): boolean {
-    return isDatabaseConnected() && getDbPool() !== null;
-  }
-
-  /** Cria a tabela de backups se ainda não existir (sem precisar rodar migration manual). */
-  private async ensureTable(): Promise<void> {
-    if (this.tableReady) return;
-    const pool = getDbPool();
-    if (!pool) throw new Error('Pool do PostgreSQL não está disponível.');
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS folha_backup (
-        id BIGSERIAL PRIMARY KEY,
-        filename TEXT NOT NULL,
-        label TEXT NOT NULL,
-        total_folhas INTEGER NOT NULL DEFAULT 0,
-        folhas JSONB NOT NULL,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `);
-    this.tableReady = true;
+    this.ensureBackupDir();
   }
 
   private ensureBackupDir() {
@@ -55,37 +16,21 @@ export class BackupService {
     }
   }
 
-  private buildFilename(label: string): string {
-    const timestamp = new Date()
-      .toISOString()
-      .replace(/[:.]/g, '-')
-      .replace('T', '_');
-    return `sessao_${label}_${timestamp}.json`;
-  }
-
   /**
    * Salva um snapshot das folhas da sessão atual
+   * - Se PostgreSQL conectado: salva na tabela backup_sessao
+   * - Senão: salva em arquivo JSON no disco (fallback)
    */
   async saveSessionBackup(
     folhas: Folha[],
     label = 'apresentacao'
   ): Promise<{ filename: string; filePath: string; count: number }> {
-    const filename = this.buildFilename(label);
+    const timestamp = new Date()
+      .toISOString()
+      .replace(/[:.]/g, '-')
+      .replace('T', '_');
+    const filename = `sessao_${label}_${timestamp}.json`;
 
-    if (this.usePg()) {
-      await this.ensureTable();
-      const pool = getDbPool()!;
-      await pool.query(
-        `INSERT INTO folha_backup (filename, label, total_folhas, folhas)
-         VALUES ($1, $2, $3, $4::jsonb)`,
-        [filename, label, folhas.length, JSON.stringify(folhas)]
-      );
-      console.log(`💾 Backup de sessão salvo no PostgreSQL: ${filename} (${folhas.length} folhas)`);
-      return { filename, filePath: `postgres:folha_backup/${filename}`, count: folhas.length };
-    }
-
-    this.ensureBackupDir();
-    const filePath = path.join(BACKUP_DIR, filename);
     const payload = {
       createdAt: new Date().toISOString(),
       label,
@@ -93,37 +38,81 @@ export class BackupService {
       folhas,
     };
 
-    fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf-8');
-    console.log(`💾 Backup de sessão salvo com sucesso em: ${filePath}`);
+    // Tenta salvar no banco se PostgreSQL estiver conectado
+    if (isDatabaseConnected()) {
+      const pool = getDbPool();
+      if (pool) {
+        try {
+          const client = await pool.connect();
+          try {
+            const folhasJson = JSON.stringify(folhas);
+            const result = await client.query(
+              `INSERT INTO backup_sessao (label, folhas_snapshot, total_folhas, repo_type)
+               VALUES ($1, $2::jsonb, $3, 'postgresql')
+               RETURNING id, created_at`,
+              [label, folhasJson, folhas.length]
+            );
+            console.log(`💾 Backup de sessão salvo no PostgreSQL (id: ${result.rows[0].id})`);
+            return {
+              filename: result.rows[0].id, // UUID do banco
+              filePath: `db://backup_sessao/${result.rows[0].id}`,
+              count: folhas.length,
+            };
+          } finally {
+            client.release();
+          }
+        } catch (error) {
+          console.error('❌ Erro ao salvar backup no PostgreSQL, caindo para filesystem:', error);
+          // Cai para fallback de filesystem
+        }
+      }
+    }
 
-    return { filename, filePath, count: folhas.length };
+    // Fallback: salva no filesystem
+    this.ensureBackupDir();
+    const filePath = path.join(BACKUP_DIR, filename);
+    fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf-8');
+    console.log(`💾 Backup de sessão salvo em arquivo: ${filePath}`);
+
+    return {
+      filename,
+      filePath,
+      count: folhas.length,
+    };
   }
 
   /**
    * Lista todos os backups de sessões disponíveis
+   * - Se PostgreSQL conectado: lê da tabela backup_sessao
+   * - Senão: lê do filesystem
    */
-  async listBackups(): Promise<BackupInfo[]> {
-    if (this.usePg()) {
-      await this.ensureTable();
-      const pool = getDbPool()!;
-      const { rows } = await pool.query<{
-        filename: string;
-        label: string;
-        total_folhas: number;
-        created_at: Date | string;
-      }>(
-        `SELECT filename, label, total_folhas, created_at
-           FROM folha_backup
-          ORDER BY created_at DESC, id DESC`
-      );
-      return rows.map((r) => ({
-        filename: r.filename,
-        createdAt: new Date(r.created_at).toISOString(),
-        totalFolhas: Number(r.total_folhas),
-        label: r.label,
-      }));
+  async listBackups(): Promise<
+    { filename: string; createdAt: string; totalFolhas: number; label: string }[]
+  > {
+    // Tenta ler do banco se PostgreSQL estiver conectado
+    if (isDatabaseConnected()) {
+      const pool = getDbPool();
+      if (pool) {
+        try {
+          const result = await pool.query(
+            `SELECT id, label, total_folhas, created_at
+             FROM backup_sessao
+             ORDER BY created_at DESC`
+          );
+          return result.rows.map((row) => ({
+            filename: row.id,
+            label: row.label,
+            totalFolhas: row.total_folhas,
+            createdAt: row.created_at.toISOString(),
+          }));
+        } catch (error) {
+          console.error('❌ Erro ao listar backups do PostgreSQL, caindo para filesystem:', error);
+          // Cai para fallback de filesystem
+        }
+      }
     }
 
+    // Fallback: lê do filesystem
     this.ensureBackupDir();
     const files = fs.readdirSync(BACKUP_DIR).filter((f) => f.endsWith('.json'));
 
@@ -152,24 +141,35 @@ export class BackupService {
 
   /**
    * Carrega as folhas de um backup específico
+   * - Se filename for UUID: tenta buscar no banco
+   * - Senão: lê do filesystem
    */
   async readBackup(filename: string): Promise<Folha[]> {
-    const safeFilename = path.basename(filename);
+    // Se parece UUID, tenta buscar no banco
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(filename);
 
-    if (this.usePg()) {
-      await this.ensureTable();
-      const pool = getDbPool()!;
-      const { rows } = await pool.query<{ folhas: Folha[] }>(
-        `SELECT folhas FROM folha_backup WHERE filename = $1 ORDER BY id DESC LIMIT 1`,
-        [safeFilename]
-      );
-      if (rows.length === 0) {
-        throw new Error(`Backup não encontrado: ${safeFilename}`);
+    if (isUuid && isDatabaseConnected()) {
+      const pool = getDbPool();
+      if (pool) {
+        try {
+          const result = await pool.query(
+            `SELECT folhas_snapshot FROM backup_sessao WHERE id = $1`,
+            [filename]
+          );
+          if (result.rows.length > 0) {
+            const snapshot = result.rows[0].folhas_snapshot;
+            return Array.isArray(snapshot) ? snapshot : snapshot.folhas || [];
+          }
+        } catch (error) {
+          console.error('❌ Erro ao ler backup do PostgreSQL, caindo para filesystem:', error);
+          // Cai para fallback
+        }
       }
-      return Array.isArray(rows[0].folhas) ? rows[0].folhas : [];
     }
 
+    // Fallback: lê do filesystem
     this.ensureBackupDir();
+    const safeFilename = path.basename(filename);
     const filePath = path.join(BACKUP_DIR, safeFilename);
 
     if (!fs.existsSync(filePath)) {
@@ -183,37 +183,56 @@ export class BackupService {
 
   /**
    * Carrega e consolida todas as folhas de TODOS os backups existentes
+   * - Se PostgreSQL conectado: lê da tabela backup_sessao
+   * - Senão: lê do filesystem
    */
   async loadAllArchivedFolhas(): Promise<Folha[]> {
-    const folhaMap = new Map<string, Folha>();
-    const absorb = (folhas: Folha[]) => {
-      for (const f of folhas) {
-        if (f.id && !folhaMap.has(f.id)) {
-          folhaMap.set(f.id, f);
+    // Tenta ler do banco se PostgreSQL estiver conectado
+    if (isDatabaseConnected()) {
+      const pool = getDbPool();
+      if (pool) {
+        try {
+          const result = await pool.query(
+            `SELECT folhas_snapshot FROM backup_sessao ORDER BY created_at DESC`
+          );
+          const folhaMap = new Map<string, Folha>();
+
+          for (const row of result.rows) {
+            const folhas: Folha[] = Array.isArray(row.folhas_snapshot)
+              ? row.folhas_snapshot
+              : row.folhas_snapshot.folhas || [];
+            for (const f of folhas) {
+              if (f.id && !folhaMap.has(f.id)) {
+                folhaMap.set(f.id, f);
+              }
+            }
+          }
+
+          return Array.from(folhaMap.values());
+        } catch (error) {
+          console.error('❌ Erro ao carregar backups do PostgreSQL, caindo para filesystem:', error);
+          // Cai para fallback
         }
       }
-    };
-
-    if (this.usePg()) {
-      await this.ensureTable();
-      const pool = getDbPool()!;
-      const { rows } = await pool.query<{ folhas: Folha[] }>(
-        `SELECT folhas FROM folha_backup ORDER BY created_at ASC, id ASC`
-      );
-      for (const row of rows) {
-        absorb(Array.isArray(row.folhas) ? row.folhas : []);
-      }
-      return Array.from(folhaMap.values());
     }
 
+    // Fallback: lê do filesystem
     this.ensureBackupDir();
     const files = fs.readdirSync(BACKUP_DIR).filter((f) => f.endsWith('.json'));
+    const folhaMap = new Map<string, Folha>();
 
     for (const file of files) {
       try {
         const content = fs.readFileSync(path.join(BACKUP_DIR, file), 'utf-8');
         const parsed = JSON.parse(content);
-        absorb(Array.isArray(parsed) ? parsed : parsed.folhas || []);
+        const folhas: Folha[] = Array.isArray(parsed)
+          ? parsed
+          : parsed.folhas || [];
+        for (const f of folhas) {
+          if (f.id && !folhaMap.has(f.id)) {
+            folhaMap.set(f.id, f);
+          }
+        }
       } catch (err) {
         console.warn(`Erro ao ler arquivo de backup ${file}:`, err);
       }
