@@ -2655,7 +2655,7 @@ export function NeuralTree({
                 NEUROTREE
               </span>
               <span className="text-[9px] text-[#94A3C8] font-mono">
-                Guarda sonhos e mensagens para o futuro dos alunos
+                Plante. Guarde. Floresça.
               </span>
             </div>
             <span className="text-[#2C3C6B]">•</span>
