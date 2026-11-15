@@ -52,6 +52,14 @@ const PRESET_COLORS = [
 
 const MOBILE_QUERY = '(max-width: 767px)';
 
+interface ConfirmOptions {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  tone: 'danger' | 'gold';
+  icon: 'reset' | 'trash' | 'restore';
+}
+
 export default function App() {
   // Celular: mostra apenas o formulário de inserir folha (cadeado de admin fica no rodapé)
   const [isMobile, setIsMobile] = useState<boolean>(() =>
@@ -69,6 +77,11 @@ export default function App() {
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [adminModalClosing, setAdminModalClosing] = useState(false);
   const adminCloseTimerRef = useRef<number | null>(null);
+
+  // Diálogo de confirmação próprio (substitui o window.confirm do navegador)
+  const [confirmState, setConfirmState] = useState<ConfirmOptions | null>(null);
+  const [confirmClosing, setConfirmClosing] = useState(false);
+  const confirmResolverRef = useRef<((value: boolean) => void) | null>(null);
   const [showAdminPassword, setShowAdminPassword] = useState(false);
   const [folhas, setFolhas] = useState<Folha[]>([]);
   const [selectedFolha, setSelectedFolha] = useState<Folha | null>(null);
@@ -142,9 +155,31 @@ export default function App() {
     return () => mql.removeEventListener('change', onChange);
   }, []);
 
+  const askConfirm = (opts: ConfirmOptions) =>
+    new Promise<boolean>((resolve) => {
+      confirmResolverRef.current = resolve;
+      setConfirmClosing(false);
+      setConfirmState(opts);
+    });
+
+  const settleConfirm = (value: boolean) => {
+    if (!confirmResolverRef.current) return;
+    confirmResolverRef.current(value);
+    confirmResolverRef.current = null;
+    setConfirmClosing(true);
+    window.setTimeout(() => {
+      setConfirmState(null);
+      setConfirmClosing(false);
+    }, 200);
+  };
+
   // Atalho escondido para abrir o painel admin: Ctrl+Shift+A (ou Ctrl+Alt+A). Esc fecha.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && confirmState && !confirmClosing) {
+        settleConfirm(false);
+        return;
+      }
       const isA = e.code === 'KeyA' || e.key.toLowerCase() === 'a';
       if ((e.ctrlKey || e.metaKey) && (e.shiftKey || e.altKey) && isA) {
         e.preventDefault();
@@ -158,7 +193,7 @@ export default function App() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showAdminModal, adminModalClosing]);
+  }, [showAdminModal, adminModalClosing, confirmState, confirmClosing]);
 
   // Se a folha aberta (texto na tela) foi deletada, fecha o texto dela
   useEffect(() => {
@@ -523,7 +558,14 @@ export default function App() {
 
   // Ações Administrativas (usam cookie JWT automaticamente via credentials: 'include')
   const handleDeleteFolha = async (id: string) => {
-    if (!window.confirm('Tem certeza que deseja excluir esta folha?')) return;
+    const ok = await askConfirm({
+      title: 'Excluir esta folha?',
+      message: 'A folha será removida da árvore para todos os visitantes.',
+      confirmLabel: 'Excluir',
+      tone: 'danger',
+      icon: 'trash',
+    });
+    if (!ok) return;
     setAdminLoading(true);
     try {
       const res = await fetch(`/api/admin/folha/${id}`, {
@@ -541,12 +583,14 @@ export default function App() {
   };
 
   const handleResetTree = async () => {
-    if (
-      !window.confirm(
-        `Resetar a árvore agora? Um backup automático da sessão "${resetTurmaLabel}" será salvo.`
-      )
-    )
-      return;
+    const ok = await askConfirm({
+      title: 'Resetar a árvore?',
+      message: `Um backup automático da sessão "${resetTurmaLabel}" será salvo e a árvore ficará vazia para a próxima turma.`,
+      confirmLabel: 'Resetar árvore',
+      tone: 'danger',
+      icon: 'reset',
+    });
+    if (!ok) return;
 
     setAdminLoading(true);
     try {
@@ -569,12 +613,15 @@ export default function App() {
   };
 
   const handleRestoreAll = async () => {
-    if (
-      !window.confirm(
-        'Deseja restaurar todas as folhas arquivadas de todos os backups para o encerramento da feira?'
-      )
-    )
-      return;
+    const ok = await askConfirm({
+      title: 'Restaurar todas as folhas?',
+      message:
+        'As folhas arquivadas de todos os backups voltarão para a árvore, para o encerramento da feira.',
+      confirmLabel: 'Restaurar tudo',
+      tone: 'gold',
+      icon: 'restore',
+    });
+    if (!ok) return;
 
     setAdminLoading(true);
     try {
@@ -605,6 +652,10 @@ export default function App() {
   };
 
   // Modais do painel admin (login por senha e painel de moderação), usados no computador e no celular
+  const confirmIsDanger = confirmState?.tone === 'danger';
+  const ConfirmIcon =
+    confirmState?.icon === 'trash' ? Trash2 : confirmState?.icon === 'restore' ? Sparkles : RotateCcw;
+
   const adminModals = (
     <>
       {/* Modal de Login Admin (Discreto - Cadeado no Rodapé) */}
@@ -833,6 +884,61 @@ export default function App() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Diálogo de confirmação (acima do painel admin) */}
+      {confirmState && (
+        <div
+          data-closing={confirmClosing}
+          onClick={() => settleConfirm(false)}
+          className="modal-backdrop fixed inset-0 z-[60] flex items-center justify-center p-4 bg-[#070B19]/80 backdrop-blur-sm"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="confirm-title"
+        >
+          <div
+            data-closing={confirmClosing}
+            onClick={(e) => e.stopPropagation()}
+            className="modal-card w-full max-w-sm bg-[#0E152B] border border-[#1E2949] rounded-3xl p-6 shadow-2xl text-center space-y-5"
+          >
+            <div
+              className={`modal-lock mx-auto w-14 h-14 rounded-2xl flex items-center justify-center border ${
+                confirmIsDanger
+                  ? 'bg-rose-500/10 border-rose-400/30 text-rose-300'
+                  : 'bg-[#F5C451]/10 border-[#F5C451]/30 text-[#F5C451]'
+              }`}
+            >
+              <ConfirmIcon className="w-6 h-6" />
+            </div>
+            <div className="space-y-1.5">
+              <h3 id="confirm-title" className="font-display text-lg font-bold text-[#F8F6F0]">
+                {confirmState.title}
+              </h3>
+              <p className="text-xs leading-relaxed text-[#94A3C8]">{confirmState.message}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                autoFocus
+                onClick={() => settleConfirm(false)}
+                className="py-2.5 rounded-xl text-sm font-semibold bg-[#131C38] hover:bg-[#1B274D] border border-[#2C3C6B] text-[#CBD5E1] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F5C451]"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => settleConfirm(true)}
+                className={`py-2.5 rounded-xl text-sm font-bold transition-all focus:outline-none focus-visible:ring-2 ${
+                  confirmIsDanger
+                    ? 'bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 hover:to-rose-500 text-white shadow-[0_8px_24px_rgba(244,63,94,0.25)] focus-visible:ring-rose-300'
+                    : 'bg-gradient-to-r from-[#F5C451] to-[#D97706] hover:from-[#F7D06D] hover:to-[#E58A1A] text-[#070B19] shadow-[0_8px_24px_rgba(245,196,81,0.22)] focus-visible:ring-[#F5C451]'
+                }`}
+              >
+                {confirmState.confirmLabel}
+              </button>
             </div>
           </div>
         </div>
