@@ -2652,10 +2652,10 @@ export function NeuralTree({
             <TreeDeciduous className="w-4 h-4 text-[#F5C451]" />
             <div className="flex flex-col">
               <span className="text-[11px] font-black tracking-wider bg-gradient-to-r from-[#F8F6F0] via-[#F5C451] to-[#D97706] bg-clip-text text-transparent">
-                ÁRVORE ANCESTRAL • TRONCO ESCULPIDO
+                NEUROTREE
               </span>
               <span className="text-[9px] text-[#94A3C8] font-mono">
-                Raízes Tabulares, Contrafortes &amp; Copa Astral
+                Guarda sonhos e mensagens para o futuro dos alunos
               </span>
             </div>
             <span className="text-[#2C3C6B]">•</span>
@@ -2855,7 +2855,7 @@ export function NeuralTree({
       <div className="relative z-30 pb-3 text-center pointer-events-none">
         <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#070B19]/85 border border-[#1E2949] text-[10px] text-[#94A3C8] backdrop-blur">
           <Sparkles className="w-3 h-3 text-[#F5C451]" />
-          <span>Árvore Ancestral • Noite Astral &amp; Ouro</span>
+          <span>NEUROTREE — Mensagens que brotam no futuro</span>
         </div>
       </div>
     </div>
