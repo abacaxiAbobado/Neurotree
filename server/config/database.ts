@@ -39,6 +39,7 @@ export function getDbPool(): pg.Pool | null {
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,
       // Force IPv4 - Render free tier doesn't support IPv6 outbound
+      // @ts-expect-error 'family' is valid at runtime but missing from @types/pg
       family: 4,
     };
 
