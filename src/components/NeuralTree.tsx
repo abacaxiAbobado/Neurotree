@@ -690,6 +690,13 @@ export function NeuralTree({
     staticDirtyRef.current = true;
   }, [leafPlacements]);
 
+  // Se a folha sob o mouse foi deletada, fecha o balão dela
+  useEffect(() => {
+    if (hoveredFolha && !folhas.some((f) => f.id === hoveredFolha.id)) {
+      setHoveredFolha(null);
+    }
+  }, [folhas, hoveredFolha]);
+
   // Detecta folhas removidas (exclusão pelo admin) e toca a animação de morte.
   // Remoções em massa (reset da árvore) não animam, para não pesar a tela.
   useEffect(() => {

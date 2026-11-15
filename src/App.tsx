@@ -142,6 +142,13 @@ export default function App() {
     return () => mql.removeEventListener('change', onChange);
   }, []);
 
+  // Se a folha aberta (texto na tela) foi deletada, fecha o texto dela
+  useEffect(() => {
+    if (selectedFolha && !folhas.some((f) => f.id === selectedFolha.id)) {
+      setSelectedFolha(null);
+    }
+  }, [folhas, selectedFolha]);
+
   // Ao enviar a folha, rola a tela até a mensagem de confirmação
   useEffect(() => {
     if (!submitSuccess || isEditing) return;
