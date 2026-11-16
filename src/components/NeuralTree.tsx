@@ -2558,7 +2558,7 @@ export function NeuralTree({
   return (
     <div
       ref={containerRef}
-      className={`relative overflow-hidden select-none bg-[#070B19] flex flex-col justify-between transition-all pt-20 ${
+      className={`relative overflow-hidden select-none bg-[#070B19] flex flex-col justify-between transition-all ${
         isFullscreen || fillScreen
           ? 'fixed inset-0 z-50 h-screen w-screen'
           : 'w-full rounded-3xl border border-[#1E2949] shadow-2xl min-h-[660px] h-[78vh]'
