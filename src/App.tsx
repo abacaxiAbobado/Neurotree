@@ -106,13 +106,16 @@ export default function App() {
   const [isEditing, setIsEditing] = useState(false);
   const [editRemainingTime, setEditRemainingTime] = useState<string>('');
 
-  // Painel Admin - Autenticação por senha + cookie JWT
+  // Painel Admin - Autenticação por senha + JWT no localStorage (cross-origin)
   const [adminPassword, setAdminPassword] = useState('');
   const [adminAuthed, setAdminAuthed] = useState(false);
   const [adminChecking, setAdminChecking] = useState(true);
   const [adminMessage, setAdminMessage] = useState<string | null>(null);
   const [resetTurmaLabel, setResetTurmaLabel] = useState('Turma 3º Ano Informática');
   const [adminLoading, setAdminLoading] = useState(false);
+
+  // Chave do token admin no localStorage
+  const ADMIN_TOKEN_KEY = 'neurotree_admin_token';
 
   // Canvas para assinatura digital
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -330,18 +333,31 @@ export default function App() {
     }
   };
 
-  // Verifica se há sessão admin válida (cookie JWT HttpOnly)
+  // Verifica se há sessão admin válida (JWT no localStorage)
   const checkAdminSession = async () => {
+    const savedToken = localStorage.getItem(ADMIN_TOKEN_KEY);
+    if (!savedToken) {
+      setAdminChecking(false);
+      return;
+    }
     try {
-      const res = await fetch('/api/admin/me', { credentials: 'include' });
+      const res = await fetch('/api/admin/me', {
+        headers: { 'Authorization': `Bearer ${savedToken}` },
+      });
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
           setAdminAuthed(true);
+        } else {
+          // Token inválido/expirado - limpa
+          localStorage.removeItem(ADMIN_TOKEN_KEY);
         }
+      } else {
+        // Token inválido - limpa
+        localStorage.removeItem(ADMIN_TOKEN_KEY);
       }
     } catch {
-      // Sem sessão válida
+      // Erro de rede - mantém token, tenta na próxima vez
     } finally {
       setAdminChecking(false);
     }
@@ -517,7 +533,7 @@ export default function App() {
     }
   };
 
-  // Admin: Login com senha
+  // Admin: Login com senha - salva JWT no localStorage
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setAdminMessage(null);
@@ -526,11 +542,13 @@ export default function App() {
       const res = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ password: adminPassword }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
+      if (data.token) {
+        localStorage.setItem(ADMIN_TOKEN_KEY, data.token);
+      }
       setAdminAuthed(true);
       setAdminMessage('✅ Login realizado com sucesso!');
       setAdminPassword(''); // Limpa senha do estado
@@ -541,22 +559,30 @@ export default function App() {
     }
   };
 
-  // Admin: Logout
+  // Admin: Logout - limpa localStorage
   const handleAdminLogout = async () => {
     setAdminLoading(true);
     try {
-      await fetch('/api/admin/logout', { method: 'POST', credentials: 'include' });
-      setAdminAuthed(false);
-      setAdminMessage('✅ Logout realizado.');
+      // Notifica backend (opcional, para logs)
+      await fetch('/api/admin/logout', { method: 'POST' });
     } catch {
+      // Ignora erro de rede
+    } finally {
+      localStorage.removeItem(ADMIN_TOKEN_KEY);
       setAdminAuthed(false);
       setAdminMessage('✅ Sessão encerrada.');
-    } finally {
       setAdminLoading(false);
     }
   };
 
-  // Ações Administrativas (usam cookie JWT automaticamente via credentials: 'include')
+  // Helper para headers admin com JWT do localStorage
+  const getAdminHeaders = (): Record<string, string> => {
+    const token = localStorage.getItem(ADMIN_TOKEN_KEY);
+    if (!token) return {};
+    return { 'Authorization': `Bearer ${token}` };
+  };
+
+  // Ações Administrativas (usam JWT no header Authorization)
   const handleDeleteFolha = async (id: string) => {
     const ok = await askConfirm({
       title: 'Excluir esta folha?',
@@ -570,7 +596,7 @@ export default function App() {
     try {
       const res = await fetch(`/api/admin/folha/${id}`, {
         method: 'DELETE',
-        credentials: 'include',
+        headers: getAdminHeaders(),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
@@ -596,8 +622,7 @@ export default function App() {
     try {
       const res = await fetch('/api/admin/reset', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...getAdminHeaders() },
         body: JSON.stringify({ label: resetTurmaLabel }),
       });
       const data = await res.json();
@@ -627,7 +652,7 @@ export default function App() {
     try {
       const res = await fetch('/api/admin/restore', {
         method: 'POST',
-        credentials: 'include',
+        headers: getAdminHeaders(),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
@@ -648,7 +673,9 @@ export default function App() {
   };
 
   const handleExportJson = () => {
-    window.open('/api/admin/export', '_blank');
+    const token = localStorage.getItem(ADMIN_TOKEN_KEY);
+    const url = token ? `/api/admin/export?token=${encodeURIComponent(token)}` : '/api/admin/export';
+    window.open(url, '_blank');
   };
 
   // Modais do painel admin (login por senha e painel de moderação), usados no computador e no celular

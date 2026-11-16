@@ -10,8 +10,6 @@ import {
   Pause,
   Search,
   Sliders,
-  Volume2,
-  VolumeX,
   TreeDeciduous,
 } from 'lucide-react';
 
@@ -469,8 +467,7 @@ export function NeuralTree({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [leafSizeMultiplier, setLeafSizeMultiplier] = useState<number>(1);
-  const [audioEnabled, setAudioEnabled] = useState<boolean>(false);
-  const [bloomDelays, setBloomDelays] = useState<Record<string, number>>({});
+    const [bloomDelays, setBloomDelays] = useState<Record<string, number>>({});
   const [dyingLeaves, setDyingLeaves] = useState<LeafPlacement[]>([]);
   const prevPlacementsRef = useRef<LeafPlacement[]>([]);
   const dyingTimersRef = useRef<number[]>([]);
@@ -478,15 +475,13 @@ export function NeuralTree({
   // Refs estáveis para evitar reiniciar o loop do canvas ao selecionar/passar o mouse/criar folhas
   const selectedFolhaRef = useRef<Folha | null>(selectedFolha);
   const hoveredFolhaRef = useRef<Folha | null>(hoveredFolha);
-  const audioEnabledRef = useRef<boolean>(audioEnabled);
-  const newLeafSetRef = useRef<Set<string>>(new Set());
+    const newLeafSetRef = useRef<Set<string>>(new Set());
   const localBirthAnimRef = useRef<Record<string, { startAt: number; delay: number }>>({});
   const staticDirtyRef = useRef<boolean>(true);
   const geomDirtyRef = useRef<boolean>(true);
 
   selectedFolhaRef.current = selectedFolha;
   hoveredFolhaRef.current = hoveredFolha;
-  audioEnabledRef.current = audioEnabled;
 
   useEffect(() => {
     const onFsChange = () => {
@@ -494,40 +489,6 @@ export function NeuralTree({
     };
     document.addEventListener('fullscreenchange', onFsChange);
     return () => document.removeEventListener('fullscreenchange', onFsChange);
-  }, []);
-
-  // Audio Context Ref (Web Audio API para som cósmico sutil no telão)
-  const audioCtxRef = useRef<AudioContext | null>(null);
-
-  // Tocar sino cósmico sutil ao focar em uma folha temporal
-  const playCosmicChime = useCallback((freq = 528) => {
-    if (!audioEnabledRef.current) return;
-    try {
-      if (!audioCtxRef.current) {
-        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      }
-      const ctx = audioCtxRef.current;
-      if (ctx.state === 'suspended') {
-        ctx.resume();
-      }
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(freq * 1.5, ctx.currentTime + 0.8);
-
-      gain.gain.setValueAtTime(0.06, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 1.2);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start();
-      osc.stop(ctx.currentTime + 1.2);
-    } catch {
-      // Ignora erro de áudio
-    }
   }, []);
 
   // Categorias de profissões únicas
@@ -712,13 +673,12 @@ export function NeuralTree({
     if (removed.length === 0 || removed.length > 5) return;
 
     setDyingLeaves((d) => [...d, ...removed]);
-    playCosmicChime(262);
     const ids = new Set(removed.map((r) => r.id));
     const timer = window.setTimeout(() => {
       setDyingLeaves((d) => d.filter((x) => !ids.has(x.id)));
     }, DYING_MS + 100);
     dyingTimersRef.current.push(timer);
-  }, [leafPlacements, playCosmicChime]);
+  }, [leafPlacements]);
 
   useEffect(
     () => () => {
@@ -777,12 +737,11 @@ export function NeuralTree({
     const interval = setInterval(() => {
       const current = folhas[idx % folhas.length];
       onSelectFolha(current);
-      playCosmicChime(432 + (idx % 8) * 40);
       idx++;
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [autoTourActive, folhas, onSelectFolha, audioEnabled]);
+  }, [autoTourActive, folhas, onSelectFolha]);
 
   // RENDERIZAÇÃO GRÁFICA NO CANVAS (OTIMIZADA COM CACHE OFFSCREEN + SPRITES + DELTA TIME)
   useEffect(() => {
@@ -2581,9 +2540,8 @@ export function NeuralTree({
   const handleHoverStart = useCallback(
     (folha: Folha) => {
       setHoveredFolha(folha);
-      playCosmicChime(659);
     },
-    [playCosmicChime]
+    []
   );
 
   const handleHoverEnd = useCallback(() => {
@@ -2593,15 +2551,14 @@ export function NeuralTree({
   const handleSelectLeaf = useCallback(
     (folha: Folha) => {
       onSelectFolha(folha);
-      playCosmicChime(587);
     },
-    [onSelectFolha, playCosmicChime]
+    [onSelectFolha]
   );
 
   return (
     <div
       ref={containerRef}
-      className={`relative overflow-hidden select-none bg-[#070B19] flex flex-col justify-between transition-all ${
+      className={`relative overflow-hidden select-none bg-[#070B19] flex flex-col justify-between transition-all pt-20 ${
         isFullscreen || fillScreen
           ? 'fixed inset-0 z-50 h-screen w-screen'
           : 'w-full rounded-3xl border border-[#1E2949] shadow-2xl min-h-[660px] h-[78vh]'
@@ -2726,35 +2683,23 @@ export function NeuralTree({
           </div>
 
           <button
-            onClick={() => setAudioEnabled(!audioEnabled)}
-            className={`p-2 rounded-xl text-xs font-semibold transition border shadow-md ${
-              audioEnabled
-                ? 'bg-[#F5C451]/15 text-[#F5C451] border-[#F5C451]/50'
-                : 'bg-[#0E152B]/85 text-[#94A3C8] hover:text-[#F8F6F0] border-[#1E2949]'
-            }`}
-            title={audioEnabled ? 'Desativar Sons Cósmicos' : 'Ativar Efeitos Cósmicos'}
-          >
-            {audioEnabled ? <Volume2 className="w-4 h-4 text-[#F5C451]" /> : <VolumeX className="w-4 h-4" />}
-          </button>
-
-          <button
             onClick={() => setAutoTourActive(!autoTourActive)}
             className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 border shadow-md ${
               autoTourActive
                 ? 'bg-[#D97706]/20 text-[#FDE68A] border-[#F5C451]/50'
                 : 'bg-[#0E152B]/85 text-[#CBD5E1] hover:text-[#F8F6F0] border-[#1E2949]'
             }`}
-            title="Percorre suavemente os sonhos dos alunos no telão"
+            title="Percorre as mensagens dos alunos no telão"
           >
             {autoTourActive ? (
               <>
                 <Pause className="w-3.5 h-3.5 text-[#F5C451]" />
-                <span>Pausar Tour</span>
+                <span>Pausar percurso</span>
               </>
             ) : (
               <>
                 <Play className="w-3.5 h-3.5 text-[#F5C451]" />
-                <span>Tour Cósmico</span>
+                <span>Percorrer mensagens</span>
               </>
             )}
           </button>

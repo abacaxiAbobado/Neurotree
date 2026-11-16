@@ -18,15 +18,26 @@ declare global {
 }
 
 /**
+ * Extrai token do header Authorization: Bearer <token>
+ */
+function extractToken(req: Request): string | null {
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith('Bearer ')) {
+    return authHeader.slice(7);
+  }
+  return null;
+}
+
+/**
  * Middleware para proteger rotas administrativas
- * Valida JWT em cookie HttpOnly 'admin_token'
+ * Valida JWT no header Authorization: Bearer <token>
  */
 export function requireAdminAuth(
   req: Request,
   res: Response,
   next: NextFunction
 ) {
-  const token = req.cookies?.admin_token;
+  const token = extractToken(req);
 
   if (!token) {
     return res.status(401).json({
@@ -73,34 +84,22 @@ export function requireAdminAuth(
 }
 
 /**
- * Gera JWT para sessão admin e define cookie HttpOnly
+ * Gera JWT para sessão admin (retorna token, não define cookie)
  */
-export function createAdminSession(res: Response): string {
+export function createAdminSession(): string {
   const token = jwt.sign(
     { role: 'admin' },
     config.jwtSecret,
     { expiresIn: '4h' }
   );
 
-  res.cookie('admin_token', token, {
-    httpOnly: true,
-    secure: config.isProduction,
-    sameSite: 'lax',
-    maxAge: config.adminSessionMaxAge,
-    path: '/',
-  });
-
   return token;
 }
 
 /**
- * Remove cookie de sessão admin (logout)
+ * Remove token de sessão admin (logout) - no token-based, frontend limpa localStorage
  */
-export function clearAdminSession(res: Response): void {
-  res.clearCookie('admin_token', {
-    httpOnly: true,
-    secure: config.isProduction,
-    sameSite: 'lax',
-    path: '/',
-  });
+export function clearAdminSession(): void {
+  // No token-based auth, logout é client-side (remover do localStorage)
+  // Mantido para compatibilidade se houver código que chame
 }

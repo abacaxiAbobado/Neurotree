@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { adminController } from '../controllers/admin.controller.ts';
-import { requireAdminAuth, createAdminSession, clearAdminSession } from '../middleware/auth.middleware.ts';
+import { requireAdminAuth, createAdminSession } from '../middleware/auth.middleware.ts';
 import { validateBody, validateParams } from '../middleware/validate.middleware.ts';
 import { folhaIdParamSchema } from '../schemas/folha.schema.ts';
 import { z } from 'zod';
@@ -15,6 +15,7 @@ const loginSchema = z.object({
 });
 
 // POST /api/admin/login - Login com senha (público, sem auth)
+// Retorna JWT no body para armazenamento em localStorage (cross-origin friendly)
 router.post('/login', validateBody(loginSchema), async (req, res) => {
   try {
     const { password } = req.body;
@@ -37,12 +38,13 @@ router.post('/login', validateBody(loginSchema), async (req, res) => {
       });
     }
 
-    // Cria sessão JWT em cookie HttpOnly
-    createAdminSession(res);
+    // Gera JWT e retorna no body (sem cookie)
+    const token = createAdminSession();
 
     return res.json({
       success: true,
       message: 'Login realizado com sucesso.',
+      token,
     });
   } catch (error) {
     console.error('Erro no login admin:', error);
@@ -54,9 +56,9 @@ router.post('/login', validateBody(loginSchema), async (req, res) => {
   }
 });
 
-// POST /api/admin/logout - Logout (requer auth)
-router.post('/logout', requireAdminAuth, (req, res) => {
-  clearAdminSession(res);
+// POST /api/admin/logout - Logout (token-based: frontend limpa localStorage)
+// Mantido para compatibilidade, mas não faz nada no servidor
+router.post('/logout', (req, res) => {
   return res.json({
     success: true,
     message: 'Logout realizado com sucesso.',
