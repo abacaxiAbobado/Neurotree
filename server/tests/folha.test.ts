@@ -155,3 +155,29 @@ describe('3. Sistema de Backup de Sessões e Reset da Árvore', () => {
     assert.ok(folhasRestauradas.length >= 1, 'Folhas devem voltar a aparecer na árvore');
   });
 });
+
+
+describe('5. Configuração do banco (DATABASE_URL)', () => {
+  test('Deve decompor DATABASE_URL e aceitar DB_SSL=true', async () => {
+    const saved = { ...process.env };
+    for (const k of ['DB_HOST','DB_PORT','DB_NAME','DB_USER','DB_PASSWORD','PGHOST','PGPORT','PGDATABASE','PGUSER','PGPASSWORD','DB_SSL','PGSSLMODE']) delete process.env[k];
+    process.env.DATABASE_URL = 'postgresql://usr.proj:p%40ss@aws-0.pooler.supabase.com:6543/postgres?sslmode=require';
+    try {
+      const { config } = await import('../config/env.ts?case=url');
+      assert.strictEqual(config.dbHost, 'aws-0.pooler.supabase.com');
+      assert.strictEqual(config.dbPort, 6543);
+      assert.strictEqual(config.dbName, 'postgres');
+      assert.strictEqual(config.dbUser, 'usr.proj');
+      assert.strictEqual(config.dbPassword, 'p@ss');
+      assert.strictEqual(config.dbSsl, true);
+
+      delete process.env.DATABASE_URL;
+      process.env.DB_SSL = 'true';
+      const { config: c2 } = await import('../config/env.ts?case=ssl');
+      assert.strictEqual(c2.dbSsl, true);
+    } finally {
+      for (const k of Object.keys(process.env)) delete process.env[k];
+      Object.assign(process.env, saved);
+    }
+  });
+});

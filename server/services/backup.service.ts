@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { getDbPool, isDatabaseConnected } from '../config/database.ts';
+import { ensureBackupTable, getDbPool, isDatabaseConnected } from '../config/database.ts';
 import { Folha } from '../repositories/folha.repository.ts';
 
 const BACKUP_DIR = path.resolve(process.cwd(), 'backups');
@@ -38,34 +38,38 @@ export class BackupService {
       folhas,
     };
 
-    // Tenta salvar no banco se PostgreSQL estiver conectado
+    // Com PostgreSQL conectado o backup TEM que ir para o banco. Se falhar, lança erro:
+    // assim o reset da árvore é abortado e nenhuma folha é perdida (o disco do Render é efêmero).
     if (isDatabaseConnected()) {
       const pool = getDbPool();
       if (pool) {
         try {
-          const client = await pool.connect();
-          try {
-            const folhasJson = JSON.stringify(folhas);
-            const result = await client.query(
-              `INSERT INTO backup_sessao (label, folhas_snapshot, total_folhas, repo_type)
-               VALUES ($1, $2::jsonb, $3, 'postgresql')
-               RETURNING id, created_at`,
-              [label, folhasJson, folhas.length]
-            );
-            console.log(`💾 Backup de sessão salvo no PostgreSQL (id: ${result.rows[0].id})`);
-            return {
-              filename: result.rows[0].id, // UUID do banco
-              filePath: `db://backup_sessao/${result.rows[0].id}`,
-              count: folhas.length,
-            };
-          } finally {
-            client.release();
-          }
+          await ensureBackupTable(pool);
+          const result = await pool.query(
+            `INSERT INTO backup_sessao (label, folhas_snapshot, total_folhas, repo_type)
+             VALUES ($1, $2::jsonb, $3, 'postgresql')
+             RETURNING id, created_at`,
+            [label.slice(0, 100) || 'sessao', JSON.stringify(folhas), folhas.length]
+          );
+          console.log(`💾 Backup de sessão salvo no PostgreSQL (id: ${result.rows[0].id})`);
+          return {
+            filename: result.rows[0].id, // UUID do banco
+            filePath: `db://backup_sessao/${result.rows[0].id}`,
+            count: folhas.length,
+          };
         } catch (error) {
-          console.error('❌ Erro ao salvar backup no PostgreSQL, caindo para filesystem:', error);
-          // Cai para fallback de filesystem
+          console.error('❌ Erro ao salvar backup no PostgreSQL:', error);
+          throw new Error(
+            'Não foi possível salvar o backup no PostgreSQL. A árvore NÃO foi resetada.'
+          );
         }
       }
+    }
+
+    if (process.env.NODE_ENV === 'production') {
+      console.warn(
+        '⚠️ PostgreSQL indisponível: o backup será gravado em disco, que é apagado a cada deploy/reinício.'
+      );
     }
 
     // Fallback: salva no filesystem
@@ -106,8 +110,8 @@ export class BackupService {
             createdAt: row.created_at.toISOString(),
           }));
         } catch (error) {
-          console.error('❌ Erro ao listar backups do PostgreSQL, caindo para filesystem:', error);
-          // Cai para fallback de filesystem
+          console.error('❌ Erro ao listar backups do PostgreSQL:', error);
+          throw error;
         }
       }
     }
@@ -161,8 +165,8 @@ export class BackupService {
             return Array.isArray(snapshot) ? snapshot : snapshot.folhas || [];
           }
         } catch (error) {
-          console.error('❌ Erro ao ler backup do PostgreSQL, caindo para filesystem:', error);
-          // Cai para fallback
+          console.error('❌ Erro ao ler backup do PostgreSQL:', error);
+          throw error;
         }
       }
     }
@@ -210,8 +214,8 @@ export class BackupService {
 
           return Array.from(folhaMap.values());
         } catch (error) {
-          console.error('❌ Erro ao carregar backups do PostgreSQL, caindo para filesystem:', error);
-          // Cai para fallback
+          console.error('❌ Erro ao carregar backups do PostgreSQL:', error);
+          throw error;
         }
       }
     }

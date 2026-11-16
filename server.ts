@@ -4,7 +4,12 @@ import cookieParser from 'cookie-parser';
 import { createServer } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { closePool, testConnection } from './server/config/database.ts';
+import {
+  closePool,
+  getLastDbErrorCode,
+  startReconnectLoop,
+  testConnection,
+} from './server/config/database.ts';
 import { config } from './server/config/env.ts';
 import { errorHandler } from './server/middleware/error.middleware.ts';
 import adminRoutes from './server/routes/admin.routes.ts';
@@ -44,6 +49,8 @@ async function startServer() {
       database: {
         type: stats.repository,
         connected: stats.databaseConnected,
+        // Código curto do último erro de conexão (ex.: ECONNREFUSED, ENOTFOUND, 28P01, NO_CONFIG)
+        error: stats.databaseConnected ? null : getLastDbErrorCode(),
       },
       totalFolhas: stats.total,
     });
@@ -94,6 +101,7 @@ async function startServer() {
 
   // 8. Teste de conexão e inicialização
   await testConnection();
+  startReconnectLoop();
 
   httpServer.listen(config.port, '0.0.0.0', () => {
     console.log(

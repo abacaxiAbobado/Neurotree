@@ -8,6 +8,7 @@
 -- ============================================================================
 
 -- Enable UUID generation extension (required for gen_random_uuid())
+-- Observação: o servidor cria esta tabela sozinho ao conectar no banco; este script é opcional.
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ============================================================================
