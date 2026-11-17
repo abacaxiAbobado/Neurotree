@@ -27,6 +27,7 @@ import {
   EyeOff,
   Smartphone,
   QrCode,
+  PenTool,
 } from 'lucide-react';
 
 export interface Folha {
@@ -83,6 +84,9 @@ export default function App() {
   const [showQrModal, setShowQrModal] = useState(false);
   const [qrModalClosing, setQrModalClosing] = useState(false);
   const qrCloseTimerRef = useRef<number | null>(null);
+  const [showSignatureModal, setShowSignatureModal] = useState<Folha | null>(null);
+  const [signatureModalClosing, setSignatureModalClosing] = useState(false);
+  const signatureCloseTimerRef = useRef<number | null>(null);
 
   // Diálogo de confirmação próprio (substitui o window.confirm do navegador)
   const [confirmState, setConfirmState] = useState<ConfirmOptions | null>(null);
@@ -153,10 +157,22 @@ export default function App() {
     }, 220);
   };
 
+  // Fecha o modal de assinatura com animação
+  const closeSignatureModal = () => {
+    if (signatureModalClosing) return;
+    setSignatureModalClosing(true);
+    signatureCloseTimerRef.current = window.setTimeout(() => {
+      setShowSignatureModal(null);
+      setSignatureModalClosing(false);
+      signatureCloseTimerRef.current = null;
+    }, 220);
+  };
+
   useEffect(
     () => () => {
       if (adminCloseTimerRef.current) window.clearTimeout(adminCloseTimerRef.current);
       if (qrCloseTimerRef.current) window.clearTimeout(qrCloseTimerRef.current);
+      if (signatureCloseTimerRef.current) window.clearTimeout(signatureCloseTimerRef.current);
     },
     []
   );
@@ -927,15 +943,26 @@ export default function App() {
                         </td>
                         <td className="p-3 max-w-xs truncate text-[#94A3C8]">{f.mensagem || '—'}</td>
                         <td className="p-3 text-right">
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteFolha(f.id)}
-                            disabled={adminLoading}
-                            className="text-rose-300 hover:text-rose-200 bg-rose-500/10 hover:bg-rose-500/20 px-2.5 py-1 rounded-lg transition-colors"
-                          >
-                            <Trash2 className="w-3.5 h-3.5 inline mr-1" />
-                            Excluir
-                          </button>
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setShowSignatureModal(f)}
+                              className="text-[#F5C451] hover:text-[#F7D06D] bg-[#F5C451]/10 hover:bg-[#F5C451]/20 px-2.5 py-1 rounded-lg transition-colors"
+                              title="Ver assinatura"
+                            >
+                              <PenTool className="w-3.5 h-3.5 inline mr-1" />
+                              Assinatura
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteFolha(f.id)}
+                              disabled={adminLoading}
+                              className="text-rose-300 hover:text-rose-200 bg-rose-500/10 hover:bg-rose-500/20 px-2.5 py-1 rounded-lg transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 inline mr-1" />
+                              Excluir
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -980,6 +1007,48 @@ export default function App() {
                 fgColor="#F5C451"
               />
               <p className="text-xs font-mono text-[#F5C451] break-all">https://neurotree-taupe.vercel.app</p>
+            </div>
+            <p className="text-xs text-[#566894]">Pressione <kbd className="px-1.5 py-0.5 bg-[#070B19] border border-[#1E2949] rounded text-[#94A3C8] font-mono">Esc</kbd> ou clique fora para fechar</p>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Visualização de Assinatura */}
+      {showSignatureModal && (
+        <div
+          data-closing={signatureModalClosing}
+          onClick={() => closeSignatureModal()}
+          className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#070B19]/95 backdrop-blur-sm"
+        >
+          <div
+            data-closing={signatureModalClosing}
+            onClick={(e) => e.stopPropagation()}
+            className="modal-card relative w-full max-w-md bg-[#0E152B] border border-[#1E2949] rounded-3xl p-6 md:p-8 shadow-2xl space-y-6 text-center"
+          >
+            <button
+              type="button"
+              onClick={closeSignatureModal}
+              className="absolute top-4 right-4 p-1 rounded-lg text-[#566894] hover:text-[#F8F6F0] hover:bg-[#131C38] transition-colors"
+              aria-label="Fechar"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="space-y-2">
+              <PenTool className="modal-lock w-10 h-10 text-[#F5C451] mx-auto" />
+              <h3 className="font-display text-lg font-bold text-[#F8F6F0]">Assinatura de {showSignatureModal.nome}</h3>
+              <p className="text-xs text-[#94A3C8]">{showSignatureModal.profissao} • {showSignatureModal.cor}</p>
+            </div>
+            <div className="bg-[#070B19] border border-[#1E2949] rounded-2xl p-4 flex flex-col items-center gap-3">
+              {showSignatureModal.assinatura && (
+                <img
+                  src={showSignatureModal.assinatura}
+                  alt={`Assinatura de ${showSignatureModal.nome}`}
+                  className="max-w-full max-h-48 rounded-lg border border-[#1E2949]"
+                />
+              )}
+              {!showSignatureModal.assinatura && (
+                <p className="text-xs text-[#566894]">Nenhuma assinatura registrada</p>
+              )}
             </div>
             <p className="text-xs text-[#566894]">Pressione <kbd className="px-1.5 py-0.5 bg-[#070B19] border border-[#1E2949] rounded text-[#94A3C8] font-mono">Esc</kbd> ou clique fora para fechar</p>
           </div>
