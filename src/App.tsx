@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { QRCodeSVG as QRCode } from 'qrcode.react';
 import { NeuralTree } from './components/NeuralTree.tsx';
 import {
   TreeDeciduous,
@@ -24,6 +25,8 @@ import {
   X,
   Eye,
   EyeOff,
+  Smartphone,
+  QrCode,
 } from 'lucide-react';
 
 export interface Folha {
@@ -77,6 +80,9 @@ export default function App() {
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [adminModalClosing, setAdminModalClosing] = useState(false);
   const adminCloseTimerRef = useRef<number | null>(null);
+  const [showQrModal, setShowQrModal] = useState(false);
+  const [qrModalClosing, setQrModalClosing] = useState(false);
+  const qrCloseTimerRef = useRef<number | null>(null);
 
   // Diálogo de confirmação próprio (substitui o window.confirm do navegador)
   const [confirmState, setConfirmState] = useState<ConfirmOptions | null>(null);
@@ -136,9 +142,21 @@ export default function App() {
     }, 220);
   };
 
+  // Fecha o modal de QR Code com animação
+  const closeQrModal = () => {
+    if (qrModalClosing) return;
+    setQrModalClosing(true);
+    qrCloseTimerRef.current = window.setTimeout(() => {
+      setShowQrModal(false);
+      setQrModalClosing(false);
+      qrCloseTimerRef.current = null;
+    }, 220);
+  };
+
   useEffect(
     () => () => {
       if (adminCloseTimerRef.current) window.clearTimeout(adminCloseTimerRef.current);
+      if (qrCloseTimerRef.current) window.clearTimeout(qrCloseTimerRef.current);
     },
     []
   );
@@ -176,7 +194,7 @@ export default function App() {
     }, 200);
   };
 
-  // Atalho escondido para abrir o painel admin: Ctrl+Shift+A (ou Ctrl+Alt+A). Esc fecha.
+  // Atalho escondido para abrir o QR Code: Ctrl+Shift+A (ou Ctrl+Alt+A). Esc fecha.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && confirmState && !confirmClosing) {
@@ -186,8 +204,11 @@ export default function App() {
       const isA = e.code === 'KeyA' || e.key.toLowerCase() === 'a';
       if ((e.ctrlKey || e.metaKey) && (e.shiftKey || e.altKey) && isA) {
         e.preventDefault();
-        if (!showAdminModal) setShowAdminModal(true);
+        if (!showQrModal) setShowQrModal(true);
         return;
+      }
+      if (e.key === 'Escape' && showQrModal) {
+        closeQrModal();
       }
       if (e.key === 'Escape' && showAdminModal) {
         closeAdminModal();
@@ -196,7 +217,7 @@ export default function App() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showAdminModal, adminModalClosing, confirmState, confirmClosing]);
+  }, [showQrModal, qrModalClosing, showAdminModal, adminModalClosing, confirmState, confirmClosing]);
 
   // Se a folha aberta (texto na tela) foi deletada, fecha o texto dela
   useEffect(() => {
@@ -916,6 +937,45 @@ export default function App() {
         </div>
       )}
 
+      {/* Modal do QR Code (Ctrl+Shift+A) */}
+      {showQrModal && (
+        <div
+          data-closing={qrModalClosing}
+          className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#070B19]/95 backdrop-blur-sm"
+        >
+          <div
+            data-closing={qrModalClosing}
+            className="modal-card relative w-full max-w-md bg-[#0E152B] border border-[#1E2949] rounded-3xl p-6 md:p-8 shadow-2xl space-y-6 text-center"
+          >
+            <button
+              type="button"
+              onClick={closeQrModal}
+              className="absolute top-4 right-4 p-1 rounded-lg text-[#566894] hover:text-[#F8F6F0] hover:bg-[#131C38] transition-colors"
+              aria-label="Fechar"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="space-y-2">
+              <QrCode className="modal-lock w-10 h-10 text-[#F5C451] mx-auto" />
+              <h3 className="font-display text-lg font-bold text-[#F8F6F0]">NEUROTREE — Link Rápido</h3>
+              <p className="text-xs text-[#94A3C8]">Escaneie para acessar a árvore no celular</p>
+            </div>
+            <div className="bg-[#070B19] border border-[#1E2949] rounded-2xl p-4 flex flex-col items-center gap-3">
+              <QRCode
+                value="https://neurotree-taupe.vercel.app"
+                size={200}
+                level="M"
+                includeMargin={true}
+                bgColor="#0E152B"
+                fgColor="#F5C451"
+              />
+              <p className="text-xs font-mono text-[#F5C451] break-all">https://neurotree-taupe.vercel.app</p>
+            </div>
+            <p className="text-xs text-[#566894]">Pressione <kbd className="px-1.5 py-0.5 bg-[#070B19] border border-[#1E2949] rounded text-[#94A3C8] font-mono">Esc</kbd> ou clique fora para fechar</p>
+          </div>
+        </div>
+      )}
+
       {/* Diálogo de confirmação (acima do painel admin) */}
       {confirmState && (
         <div
@@ -986,6 +1046,43 @@ export default function App() {
           newLeafBirths={newLeafBirths}
         />
         {adminModals}
+        {showQrModal && (
+          <div
+            data-closing={qrModalClosing}
+            className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#070B19]/95 backdrop-blur-sm"
+          >
+            <div
+              data-closing={qrModalClosing}
+              className="modal-card relative w-full max-w-md bg-[#0E152B] border border-[#1E2949] rounded-3xl p-6 md:p-8 shadow-2xl space-y-6 text-center"
+            >
+              <button
+                type="button"
+                onClick={closeQrModal}
+                className="absolute top-4 right-4 p-1 rounded-lg text-[#566894] hover:text-[#F8F6F0] hover:bg-[#131C38] transition-colors"
+                aria-label="Fechar"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <div className="space-y-2">
+                <QrCode className="modal-lock w-10 h-10 text-[#F5C451] mx-auto" />
+                <h3 className="font-display text-lg font-bold text-[#F8F6F0]">NEUROTREE — Link Rápido</h3>
+                <p className="text-xs text-[#94A3C8]">Escaneie para acessar a árvore no celular</p>
+              </div>
+              <div className="bg-[#070B19] border border-[#1E2949] rounded-2xl p-4 flex flex-col items-center gap-3">
+                <QRCode
+                  value="https://neurotree-taupe.vercel.app"
+                  size={200}
+                  level="M"
+                  includeMargin={true}
+                  bgColor="#0E152B"
+                  fgColor="#F5C451"
+                />
+                <p className="text-xs font-mono text-[#F5C451] break-all">https://neurotree-taupe.vercel.app</p>
+              </div>
+              <p className="text-xs text-[#566894]">Pressione <kbd className="px-1.5 py-0.5 bg-[#070B19] border border-[#1E2949] rounded text-[#94A3C8] font-mono">Esc</kbd> ou clique fora para fechar</p>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
