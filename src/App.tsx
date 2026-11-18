@@ -1338,6 +1338,23 @@ export default function App() {
                     Olhe para o telão agora! Sua folha com o sonho de{' '}
                     <strong className="text-[#F5C451]">{submitSuccess.profissao}</strong> já está brotando.
                   </p>
+                  <div className="flex items-center justify-between pt-3 border-t border-[#F5C451]/20 gap-3 flex-wrap">
+                    <span className="text-xs text-[#94A3C8]">
+                      Quer plantar mais uma folha neste dispositivo?
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSubmitSuccess(null);
+                        setFormError(null);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="text-xs bg-[#131C38] border border-[#2C3C6B] text-[#F8F6F0] font-semibold px-3.5 py-1.5 rounded-lg hover:bg-[#1B274D] transition-colors flex items-center gap-1.5"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      Enviar outra folha
+                    </button>
+                  </div>
                   {myEditToken && (
                     <div className="flex items-center justify-between pt-3 border-t border-[#F5C451]/20 gap-3 flex-wrap">
                       <span className="text-xs text-[#94A3C8]">
