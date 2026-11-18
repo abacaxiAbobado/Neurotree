@@ -4,12 +4,13 @@ import cookieParser from 'cookie-parser';
 import { createServer } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { closePool, testConnection } from './server/config/database.ts';
+import { closePool, startReconnectLoop, testConnection, isDatabaseConnected } from './server/config/database.ts';
 import { config } from './server/config/env.ts';
 import { errorHandler } from './server/middleware/error.middleware.ts';
 import adminRoutes from './server/routes/admin.routes.ts';
 import folhaRoutes from './server/routes/folha.routes.ts';
 import { folhaService } from './server/services/folha.service.ts';
+import { backupService } from './server/services/backup.service.ts';
 import { initSocketServer } from './server/socket/socket.handler.ts';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -94,6 +95,29 @@ async function startServer() {
 
   // 8. Teste de conexão e inicialização
   await testConnection();
+  startReconnectLoop();
+
+  // 9. Backup automático das folhas no PostgreSQL (a cada 10 min, só se mudou)
+  let lastBackupSignature = '';
+  const AUTO_BACKUP_LABEL = 'auto-backup';
+  const runAutoBackup = async () => {
+    if (!isDatabaseConnected()) return;
+    try {
+      const folhas = await folhaService.exportAll();
+      if (folhas.length === 0) return;
+      const signature = folhas
+        .map((f) => `${f.id}:${new Date(f.updated_at).getTime()}`)
+        .sort()
+        .join('|');
+      if (signature === lastBackupSignature) return;
+      await backupService.saveSessionBackup(folhas, AUTO_BACKUP_LABEL);
+      lastBackupSignature = signature;
+      await backupService.pruneAutoBackups(AUTO_BACKUP_LABEL, 24);
+    } catch (error) {
+      console.error('❌ Falha no backup automático:', error);
+    }
+  };
+  setInterval(runAutoBackup, 10 * 60 * 1000).unref();
 
   httpServer.listen(config.port, '0.0.0.0', () => {
     console.log(

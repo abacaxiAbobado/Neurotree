@@ -263,8 +263,11 @@ export default function App() {
       .then((res) => res.json())
       .then((data) => {
         if (data?.success && Array.isArray(data.data)) {
-          setFolhas(data.data);
-          setTotalCount(data.total || data.data.length);
+          // Nunca troca uma árvore cheia por uma vazia (ex.: servidor reiniciando)
+          setFolhas((prev) => (data.data.length === 0 && prev.length > 0 ? prev : data.data));
+          setTotalCount((prev) =>
+            data.data.length === 0 && prev > 0 ? prev : data.total || data.data.length
+          );
         }
       })
       .catch(() => {});
@@ -278,8 +281,10 @@ export default function App() {
       // Solicita estado inicial
       socket.emit('telao:getInitialState', (res: any) => {
         if (res?.success && Array.isArray(res.data)) {
-          setFolhas(res.data);
-          setTotalCount(res.data.length);
+          setFolhas((prev) => (res.data.length === 0 && prev.length > 0 ? prev : res.data));
+          setTotalCount((prev) =>
+            res.data.length === 0 && prev > 0 ? prev : res.data.length
+          );
         }
       });
     });

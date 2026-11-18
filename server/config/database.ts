@@ -72,6 +72,7 @@ export async function testConnection(): Promise<boolean> {
       const res = await client.query('SELECT NOW() as now');
       isConnected = true;
       console.log('✅ Conectado com sucesso ao PostgreSQL:', res.rows[0].now);
+      await ensureBackupTable(client);
       return true;
     } finally {
       client.release();
@@ -84,6 +85,46 @@ export async function testConnection(): Promise<boolean> {
     );
     return false;
   }
+}
+
+/**
+ * Garante que a tabela de backups exista (idempotente).
+ * Falhar aqui não derruba a conexão: só registra o aviso.
+ */
+async function ensureBackupTable(client: pg.PoolClient): Promise<void> {
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS backup_sessao (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        label VARCHAR(100) NOT NULL,
+        folhas_snapshot JSONB NOT NULL,
+        total_folhas INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        repo_type VARCHAR(20) NOT NULL DEFAULT 'memory'
+      )
+    `);
+    await client.query(
+      'CREATE INDEX IF NOT EXISTS idx_backup_sessao_created_at_desc ON backup_sessao (created_at DESC)'
+    );
+  } catch (error) {
+    console.warn('⚠️ Não foi possível garantir a tabela backup_sessao:', (error as Error).message);
+  }
+}
+
+let reconnectTimer: NodeJS.Timeout | null = null;
+
+/**
+ * Enquanto o banco estiver desconectado, tenta reconectar a cada 15 s,
+ * para o servidor não ficar preso no fallback em memória.
+ */
+export function startReconnectLoop(intervalMs = 15000): void {
+  if (reconnectTimer) return;
+  reconnectTimer = setInterval(async () => {
+    if (isConnected) return;
+    console.warn('⚠️ Banco desconectado: tentando reconectar...');
+    await testConnection();
+  }, intervalMs);
+  reconnectTimer.unref();
 }
 
 export function isDatabaseConnected(): boolean {

@@ -82,6 +82,24 @@ export class BackupService {
   }
 
   /**
+   * Mantém só os N backups automáticos mais recentes no PostgreSQL
+   */
+  async pruneAutoBackups(label: string, keep: number): Promise<void> {
+    if (!isDatabaseConnected()) return;
+    const pool = getDbPool();
+    if (!pool) return;
+    await pool.query(
+      `DELETE FROM backup_sessao
+       WHERE label = $1
+         AND id NOT IN (
+           SELECT id FROM backup_sessao WHERE label = $1
+           ORDER BY created_at DESC LIMIT $2
+         )`,
+      [label, keep]
+    );
+  }
+
+  /**
    * Lista todos os backups de sessões disponíveis
    * - Se PostgreSQL conectado: lê da tabela backup_sessao
    * - Senão: lê do filesystem
